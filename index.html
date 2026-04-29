@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>My Start</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="page-shell">
+      <button class="icon-button edit-mode-button" id="editModeButton" type="button" aria-label="进入编辑模式">
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <path d="M12 20h9"></path>
+          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+        </svg>
+      </button>
+
+      <div class="edit-toolbar" id="editToolbar" hidden>
+        <button class="toolbar-button done-button" id="doneEditButton" type="button">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M20 6 9 17l-5-5"></path>
+          </svg>
+          完成
+        </button>
+        <label class="secondary-button file-button toolbar-button" for="importConfigInput">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M12 3v12"></path>
+            <path d="m7 8 5-5 5 5"></path>
+            <path d="M5 21h14"></path>
+          </svg>
+          导入配置
+        </label>
+        <input class="visually-hidden" id="importConfigInput" type="file" accept="application/json,.json">
+        <button class="secondary-button toolbar-button" id="exportConfigButton" type="button">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M12 21V9"></path>
+            <path d="m7 16 5 5 5-5"></path>
+            <path d="M5 3h14"></path>
+          </svg>
+          导出配置
+        </button>
+      </div>
+
+      <main class="start-panel" aria-labelledby="pageTitle">
+        <p class="eyebrow">Personal Start</p>
+        <h1 id="pageTitle">My Start</h1>
+
+        <form class="search-form" id="searchForm" role="search">
+          <label class="visually-hidden" for="searchInput">搜索网站或输入关键词</label>
+          <div class="search-box" id="searchBox">
+            <button class="search-engine-button" id="searchEngineButton" type="button" aria-label="切换搜索引擎" aria-expanded="false">
+              <img id="searchEngineIcon" src="" alt="">
+            </button>
+            <div class="search-engine-menu" id="searchEngineMenu" hidden></div>
+            <input id="searchInput" type="search" autocomplete="off" placeholder="搜索网站或输入关键词...">
+          </div>
+        </form>
+
+        <nav class="group-tabs" id="groupTabs" aria-label="导航分组"></nav>
+
+        <section class="site-section" aria-live="polite">
+          <div class="site-grid" id="siteGrid"></div>
+          <p class="empty-state" id="emptyState" hidden></p>
+        </section>
+      </main>
+    </div>
+
+    <div class="modal-backdrop" id="modalBackdrop" hidden></div>
+
+    <section class="edit-modal" id="editModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="modalTitle" hidden>
+      <header class="modal-header">
+        <div>
+          <p class="eyebrow">Edit</p>
+          <h2 id="modalTitle">编辑</h2>
+        </div>
+        <button class="icon-button" id="closeModalButton" type="button" aria-label="关闭弹窗">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M18 6 6 18"></path>
+            <path d="m6 6 12 12"></path>
+          </svg>
+        </button>
+      </header>
+
+      <form class="modal-form" id="groupForm" hidden>
+        <input id="groupIdInput" type="hidden">
+
+        <label for="groupNameInput">分组名称</label>
+        <input id="groupNameInput" type="text" maxlength="16" placeholder="例如：工作" required>
+
+        <div class="modal-actions">
+          <button class="primary-button" type="submit">保存分组</button>
+          <button class="danger-button" id="deleteGroupButton" type="button" hidden>删除分组</button>
+        </div>
+      </form>
+
+      <form class="modal-form" id="siteForm" hidden>
+        <input id="siteIdInput" type="hidden">
+
+        <label for="siteGroupInput">所属分组</label>
+        <select id="siteGroupInput" required></select>
+
+        <label for="siteNameInput">网页名称</label>
+        <input id="siteNameInput" type="text" maxlength="32" placeholder="例如：GitHub" required>
+
+        <label for="siteUrlInput">网页链接</label>
+        <input id="siteUrlInput" type="text" placeholder="https://github.com" required>
+
+        <label for="siteIconInput">图标链接</label>
+        <input id="siteIconInput" type="text" placeholder="可选，留空会显示首字母">
+
+        <div class="modal-actions">
+          <button class="primary-button" type="submit">保存网页</button>
+        </div>
+      </form>
+    </section>
+
+    <div class="toast" id="toast" role="status" aria-live="polite">
+      <span id="toastMessage"></span>
+      <button id="toastAction" type="button" hidden></button>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
