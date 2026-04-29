@@ -8,12 +8,21 @@
   </head>
   <body>
     <div class="page-shell">
-      <button class="icon-button edit-mode-button" id="editModeButton" type="button" aria-label="进入编辑模式">
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <path d="M12 20h9"></path>
-          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
-        </svg>
-      </button>
+      <div class="top-actions">
+        <button class="icon-button background-button" id="backgroundButton" type="button" aria-label="设置背景">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+            <circle cx="8.5" cy="10" r="1.5"></circle>
+            <path d="m21 15-4.5-4.5L7 20"></path>
+          </svg>
+        </button>
+        <button class="icon-button edit-mode-button" id="editModeButton" type="button" aria-label="进入编辑模式">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+          </svg>
+        </button>
+      </div>
 
       <div class="edit-toolbar" id="editToolbar" hidden>
         <button class="toolbar-button done-button" id="doneEditButton" type="button">
@@ -110,6 +119,39 @@
 
         <div class="modal-actions">
           <button class="primary-button" type="submit">保存网页</button>
+        </div>
+      </form>
+
+      <form class="modal-form background-form" id="backgroundForm" hidden>
+        <label>背景样式</label>
+        <div class="background-choices" role="radiogroup" aria-label="背景样式">
+          <button class="background-choice" data-background-choice="white" type="button" role="radio">
+            <span class="background-swatch background-swatch-white"></span>
+            <span>白色</span>
+          </button>
+          <button class="background-choice" data-background-choice="black" type="button" role="radio">
+            <span class="background-swatch background-swatch-black"></span>
+            <span>黑色</span>
+          </button>
+          <button class="background-choice" data-background-choice="image" type="button" role="radio">
+            <span class="background-swatch background-swatch-image"></span>
+            <span>图片</span>
+          </button>
+        </div>
+
+        <div class="background-preview" id="backgroundPreview" aria-hidden="true">
+          <span id="backgroundPreviewText">未选择图片</span>
+        </div>
+
+        <input class="visually-hidden" id="backgroundImageInput" type="file" accept="image/*">
+
+        <div class="background-upload-actions">
+          <button class="secondary-button" id="uploadBackgroundImageButton" type="button">选择图片</button>
+          <button class="secondary-button" id="clearBackgroundImageButton" type="button">移除图片</button>
+        </div>
+
+        <div class="modal-actions">
+          <button class="primary-button" type="submit">保存背景</button>
         </div>
       </form>
     </section>

@@ -43,6 +43,35 @@ body {
   color: var(--text);
 }
 
+body[data-background="white"] {
+  background: #f7f8f5;
+}
+
+body[data-background="black"] {
+  background: #080b0f;
+}
+
+body[data-background="black"] h1,
+body[data-background="black"] .start-panel > .eyebrow {
+  color: #f7f8f5;
+}
+
+body[data-background="black"] h1 {
+  text-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+}
+
+body[data-background="image"] {
+  background: var(--custom-background-image), #f7f8f5;
+  background-attachment: fixed;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+body[data-background="image"] h1 {
+  text-shadow: 0 10px 28px rgba(255, 255, 255, 0.44);
+}
+
 body.is-editing {
   overflow-x: hidden;
 }
@@ -69,11 +98,13 @@ svg {
   padding: 58px 24px 48px;
 }
 
-.edit-mode-button {
+.top-actions {
   position: fixed;
   top: 24px;
   right: 24px;
   z-index: 20;
+  display: flex;
+  gap: 8px;
 }
 
 .edit-mode-button.is-active {
@@ -726,6 +757,113 @@ button.site-icon:hover {
   margin-top: 10px;
 }
 
+.background-form {
+  gap: 12px;
+}
+
+.background-choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.background-choice {
+  min-height: 72px;
+  display: grid;
+  place-items: center;
+  gap: 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-card);
+  background: var(--surface-soft);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 720;
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.background-choice:hover {
+  transform: translateY(-1px);
+  background: var(--surface);
+}
+
+.background-choice.is-active {
+  border-color: var(--dark);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(32, 38, 49, 0.08);
+}
+
+.background-swatch {
+  width: 30px;
+  height: 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
+
+.background-swatch-white {
+  background: #ffffff;
+}
+
+.background-swatch-black {
+  background: #080b0f;
+}
+
+.background-swatch-image {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0)),
+    linear-gradient(135deg, #b9c9c1, #f2dfc8 52%, #9eb5c8);
+}
+
+.background-preview {
+  min-height: 126px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: #f7f8f5;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 680;
+  overflow: hidden;
+  text-align: center;
+}
+
+.background-preview[data-preview="black"] {
+  background: #080b0f;
+  color: #f7f8f5;
+}
+
+.background-preview[data-preview="image"] {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  color: #ffffff;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.4);
+}
+
+.background-preview[data-preview="image"]::before {
+  content: "";
+  width: 100%;
+  height: 100%;
+  grid-area: 1 / 1;
+  background: rgba(32, 38, 49, 0.18);
+}
+
+.background-preview span {
+  grid-area: 1 / 1;
+  z-index: 1;
+}
+
+.background-upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .primary-button,
 .secondary-button,
 .danger-button {
@@ -856,6 +994,10 @@ button.site-icon:hover {
   }
 
   .edit-mode-button {
+    position: static;
+  }
+
+  .top-actions {
     top: 16px;
     right: 16px;
   }

@@ -1,7 +1,18 @@
-const DATA_VERSION = 1;
+const DATA_VERSION = 3;
 const MAX_SITES_PER_GROUP = 15;
+const MAX_BACKGROUND_IMAGE_BYTES = 3 * 1024 * 1024;
 const STORAGE_KEY = "my-start-config-v1";
+const NAVIGATION_PRESET_ID = "personal-a-v1";
+const ASSET_DB_NAME = "my-start-assets-v1";
+const ASSET_STORE_NAME = "assets";
+const BACKGROUND_ASSET_KEY = "background-image";
 const FAVICON_SERVICE_TEMPLATE = "https://www.google.com/s2/favicons?domain={domain}&sz=64";
+const BACKGROUND_TYPES = new Set(["white", "black", "image"]);
+const DEFAULT_BACKGROUND_SETTINGS = {
+  type: "white",
+  image: "",
+  imageKey: "",
+};
 
 const SEARCH_ENGINES = [
   {
@@ -80,99 +91,82 @@ function nowIso() {
 
 function createDefaultData() {
   const groups = [
-    { id: "group-work", name: "工作" },
+    { id: "group-a", name: "A" },
+    { id: "group-dev", name: "开发" },
     { id: "group-ai", name: "AI" },
     { id: "group-study", name: "学习" },
     { id: "group-tools", name: "工具" },
-    { id: "group-life", name: "娱乐" },
+    { id: "group-fun", name: "娱乐" },
     { id: "group-temp", name: "临时" },
   ];
 
+  const site = (groupId, id, name, url, icon = "") => ({
+    id: `site-${id}`,
+    groupId,
+    name,
+    url,
+    icon: icon || getFaviconUrl(url),
+  });
+
   const sites = [
-    {
-      id: "site-github",
-      groupId: "group-work",
-      name: "GitHub",
-      url: "https://github.com",
-      icon: "https://github.com/favicon.ico",
-    },
-    {
-      id: "site-notion",
-      groupId: "group-work",
-      name: "Notion",
-      url: "https://www.notion.so",
-      icon: "https://www.notion.so/images/favicon.ico",
-    },
-    {
-      id: "site-gmail",
-      groupId: "group-work",
-      name: "Gmail",
-      url: "https://mail.google.com",
-      icon: "https://mail.google.com/favicon.ico",
-    },
-    {
-      id: "site-vercel",
-      groupId: "group-work",
-      name: "Vercel",
-      url: "https://vercel.com",
-      icon: "https://vercel.com/favicon.ico",
-    },
-    {
-      id: "site-figma",
-      groupId: "group-work",
-      name: "Figma",
-      url: "https://www.figma.com",
-      icon: "https://static.figma.com/app/icon/1/favicon.png",
-    },
-    {
-      id: "site-docs",
-      groupId: "group-work",
-      name: "Docs",
-      url: "https://docs.google.com",
-      icon: "https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico",
-    },
-    {
-      id: "site-drive",
-      groupId: "group-work",
-      name: "Drive",
-      url: "https://drive.google.com",
-      icon: "https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png",
-    },
-    {
-      id: "site-calendar",
-      groupId: "group-work",
-      name: "Calendar",
-      url: "https://calendar.google.com",
-      icon: "https://calendar.google.com/googlecalendar/images/favicons_2020q4/calendar_31.ico",
-    },
-    {
-      id: "site-chatgpt",
-      groupId: "group-ai",
-      name: "ChatGPT",
-      url: "https://chatgpt.com",
-      icon: "https://chatgpt.com/favicon.ico",
-    },
-    {
-      id: "site-claude",
-      groupId: "group-ai",
-      name: "Claude",
-      url: "https://claude.ai",
-      icon: "https://claude.ai/favicon.ico",
-    },
-    {
-      id: "site-mdn",
-      groupId: "group-study",
-      name: "MDN",
-      url: "https://developer.mozilla.org",
-      icon: "https://developer.mozilla.org/favicon-48x48.cbbd161b.png",
-    },
-    {
-      id: "site-youtube",
-      groupId: "group-life",
-      name: "YouTube",
-      url: "https://www.youtube.com",
-      icon: "https://www.youtube.com/favicon.ico",
-    },
+    site("group-a", "github", "GitHub", "https://github.com", "https://github.com/favicon.ico"),
+    site("group-a", "linuxdo", "Linux.do", "https://linux.do"),
+    site("group-a", "zhihu", "知乎", "https://www.zhihu.com"),
+    site("group-a", "gemini", "Gemini", "https://gemini.google.com"),
+    site("group-a", "chatgpt", "ChatGPT", "https://chatgpt.com", "https://chatgpt.com/favicon.ico"),
+    site("group-a", "bilibili", "哔哩哔哩", "https://www.bilibili.com"),
+    site("group-a", "x", "推特", "https://x.com"),
+    site("group-a", "youtube", "YouTube", "https://www.youtube.com", "https://www.youtube.com/favicon.ico"),
+
+    site("group-dev", "mdn", "MDN", "https://developer.mozilla.org"),
+    site("group-dev", "stackoverflow", "Stack Overflow", "https://stackoverflow.com"),
+    site("group-dev", "vercel", "Vercel", "https://vercel.com", "https://vercel.com/favicon.ico"),
+    site("group-dev", "cloudflare", "Cloudflare", "https://dash.cloudflare.com"),
+    site("group-dev", "npm", "npm", "https://www.npmjs.com"),
+    site("group-dev", "docker", "Docker Hub", "https://hub.docker.com"),
+    site("group-dev", "gitlab", "GitLab", "https://gitlab.com"),
+    site("group-dev", "regex101", "Regex101", "https://regex101.com"),
+
+    site("group-ai", "claude", "Claude", "https://claude.ai", "https://claude.ai/favicon.ico"),
+    site("group-ai", "perplexity", "Perplexity", "https://www.perplexity.ai"),
+    site("group-ai", "poe", "Poe", "https://poe.com"),
+    site("group-ai", "huggingface", "Hugging Face", "https://huggingface.co"),
+    site("group-ai", "openrouter", "OpenRouter", "https://openrouter.ai"),
+    site("group-ai", "grok", "Grok", "https://grok.com"),
+    site("group-ai", "replicate", "Replicate", "https://replicate.com"),
+
+    site("group-study", "wikipedia", "Wikipedia", "https://www.wikipedia.org"),
+    site("group-study", "leetcode", "LeetCode", "https://leetcode.cn"),
+    site("group-study", "runoob", "菜鸟教程", "https://www.runoob.com"),
+    site("group-study", "coursera", "Coursera", "https://www.coursera.org"),
+    site("group-study", "edx", "edX", "https://www.edx.org"),
+    site("group-study", "khan", "Khan Academy", "https://www.khanacademy.org"),
+    site("group-study", "duolingo", "Duolingo", "https://www.duolingo.com"),
+
+    site("group-tools", "gmail", "Gmail", "https://mail.google.com", "https://mail.google.com/favicon.ico"),
+    site("group-tools", "drive", "Drive", "https://drive.google.com", "https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png"),
+    site("group-tools", "docs", "Docs", "https://docs.google.com", "https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico"),
+    site("group-tools", "calendar", "Calendar", "https://calendar.google.com", "https://calendar.google.com/googlecalendar/images/favicons_2020q4/calendar_31.ico"),
+    site("group-tools", "notion", "Notion", "https://www.notion.so", "https://www.notion.so/images/favicon.ico"),
+    site("group-tools", "figma", "Figma", "https://www.figma.com", "https://static.figma.com/app/icon/1/favicon.png"),
+    site("group-tools", "translate", "Google 翻译", "https://translate.google.com"),
+    site("group-tools", "deepl", "DeepL", "https://www.deepl.com/translator"),
+    site("group-tools", "tinypng", "TinyPNG", "https://tinypng.com"),
+
+    site("group-fun", "steam", "Steam", "https://store.steampowered.com"),
+    site("group-fun", "spotify", "Spotify", "https://open.spotify.com"),
+    site("group-fun", "twitch", "Twitch", "https://www.twitch.tv"),
+    site("group-fun", "netflix", "Netflix", "https://www.netflix.com"),
+    site("group-fun", "douban", "豆瓣", "https://www.douban.com"),
+    site("group-fun", "xiaohongshu", "小红书", "https://www.xiaohongshu.com"),
+    site("group-fun", "netease-music", "网易云音乐", "https://music.163.com"),
+
+    site("group-temp", "google", "Google", "https://www.google.com", "https://www.google.com/favicon.ico"),
+    site("group-temp", "bing", "Bing", "https://www.bing.com", "https://www.bing.com/favicon.ico"),
+    site("group-temp", "baidu", "百度", "https://www.baidu.com", "https://www.baidu.com/favicon.ico"),
+    site("group-temp", "weibo", "微博", "https://weibo.com"),
+    site("group-temp", "taobao", "淘宝", "https://www.taobao.com"),
+    site("group-temp", "jd", "京东", "https://www.jd.com"),
   ];
 
   return {
@@ -183,6 +177,8 @@ function createDefaultData() {
       searchEngineId: "google",
       searchEngineName: "Google",
       searchUrlTemplate: "https://www.google.com/search?q={query}",
+      background: { ...DEFAULT_BACKGROUND_SETTINGS },
+      navigationPresetId: NAVIGATION_PRESET_ID,
     },
     updatedAt: nowIso(),
   };
@@ -263,6 +259,12 @@ function normalizeSettings(sourceSettings, fallbackSettings) {
     SEARCH_ENGINES.find((item) => item.name === rawSettings.searchEngineName) ||
     SEARCH_ENGINES.find((item) => item.searchUrlTemplate === rawSettings.searchUrlTemplate) ||
     SEARCH_ENGINES[0];
+  const background = normalizeBackgroundSettings(
+    rawSettings.background || {
+      type: rawSettings.backgroundType,
+      image: rawSettings.backgroundImage,
+    },
+  );
 
   return {
     ...fallbackSettings,
@@ -270,6 +272,131 @@ function normalizeSettings(sourceSettings, fallbackSettings) {
     searchEngineId: engine.id,
     searchEngineName: engine.name,
     searchUrlTemplate: engine.searchUrlTemplate,
+    background,
+  };
+}
+
+function normalizeBackgroundSettings(sourceBackground) {
+  const rawBackground =
+    sourceBackground && typeof sourceBackground === "object" ? sourceBackground : {};
+  const type = BACKGROUND_TYPES.has(rawBackground.type) ? rawBackground.type : "white";
+  const image = normalizeText(rawBackground.image);
+  const imageKey = normalizeText(rawBackground.imageKey) || (image ? BACKGROUND_ASSET_KEY : "");
+
+  if (type === "image") {
+    return image || imageKey ? { type, image, imageKey } : { ...DEFAULT_BACKGROUND_SETTINGS };
+  }
+
+  return {
+    type,
+    image: "",
+    imageKey: "",
+  };
+}
+
+function openAssetDb() {
+  return new Promise((resolve, reject) => {
+    if (!("indexedDB" in window)) {
+      reject(new Error("IndexedDB is not available."));
+      return;
+    }
+
+    const request = window.indexedDB.open(ASSET_DB_NAME, 1);
+
+    request.addEventListener("upgradeneeded", () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(ASSET_STORE_NAME)) {
+        db.createObjectStore(ASSET_STORE_NAME);
+      }
+    });
+
+    request.addEventListener("success", () => resolve(request.result));
+    request.addEventListener("error", () => reject(request.error));
+  });
+}
+
+function withAssetStore(mode, callback) {
+  return openAssetDb().then(
+    (db) =>
+      new Promise((resolve, reject) => {
+        const transaction = db.transaction(ASSET_STORE_NAME, mode);
+        const store = transaction.objectStore(ASSET_STORE_NAME);
+        const request = callback(store);
+
+        request.addEventListener("success", () => resolve(request.result));
+        request.addEventListener("error", () => reject(request.error));
+        transaction.addEventListener("complete", () => db.close());
+        transaction.addEventListener("abort", () => {
+          db.close();
+          reject(transaction.error);
+        });
+      }),
+  );
+}
+
+const backgroundAssetStorage = {
+  async load(key = BACKGROUND_ASSET_KEY) {
+    return (await withAssetStore("readonly", (store) => store.get(key))) || "";
+  },
+
+  async save(image, key = BACKGROUND_ASSET_KEY) {
+    await withAssetStore("readwrite", (store) => store.put(image, key));
+    return key;
+  },
+
+  async remove(key = BACKGROUND_ASSET_KEY) {
+    await withAssetStore("readwrite", (store) => store.delete(key));
+  },
+};
+
+async function persistBackgroundAsset(data) {
+  const nextData = cloneData(data);
+  const background = normalizeBackgroundSettings(nextData.settings.background);
+
+  if (background.type === "image") {
+    if (background.image) {
+      background.imageKey = await backgroundAssetStorage.save(background.image);
+      background.image = "";
+    }
+
+    nextData.settings.background = normalizeBackgroundSettings(background);
+    return nextData;
+  }
+
+  await backgroundAssetStorage.remove().catch((error) => {
+    console.warn("Failed to remove saved background image.", error);
+  });
+  nextData.settings.background = background;
+  return nextData;
+}
+
+function shouldApplyNavigationPresetMigration(source) {
+  if (!source || typeof source !== "object") {
+    return false;
+  }
+
+  const sourceVersion = Number(source.version || 0);
+  const sourcePresetId = normalizeText(source.settings?.navigationPresetId);
+  return sourceVersion < DATA_VERSION && sourcePresetId !== NAVIGATION_PRESET_ID;
+}
+
+function applyNavigationPresetMigration(source) {
+  const preset = createDefaultData();
+  const sourceSettings =
+    source && typeof source === "object" && source.settings && typeof source.settings === "object"
+      ? source.settings
+      : {};
+
+  return {
+    ...source,
+    version: DATA_VERSION,
+    groups: preset.groups,
+    sites: preset.sites,
+    settings: {
+      ...normalizeSettings(sourceSettings, preset.settings),
+      navigationPresetId: NAVIGATION_PRESET_ID,
+    },
+    updatedAt: nowIso(),
   };
 }
 
@@ -280,30 +407,57 @@ const localStorageAdapter = {
       return createDefaultData();
     }
 
+    let normalized;
     try {
-      return normalizeData(JSON.parse(raw));
+      const source = JSON.parse(raw);
+      normalized = normalizeData(
+        shouldApplyNavigationPresetMigration(source) ? applyNavigationPresetMigration(source) : source,
+      );
     } catch (error) {
       console.warn("Failed to parse saved start page data.", error);
       return createDefaultData();
     }
+
+    try {
+      const persisted = await persistBackgroundAsset(normalized);
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
+      return persisted;
+    } catch (error) {
+      console.warn("Failed to migrate saved background image.", error);
+      return normalized;
+    }
   },
 
   async save(data) {
-    const normalized = normalizeData({
-      ...data,
-      updatedAt: nowIso(),
-    });
+    const normalized = await persistBackgroundAsset(
+      normalizeData({
+        ...data,
+        updatedAt: nowIso(),
+      }),
+    );
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
     return normalized;
   },
 
   async export() {
-    const data = await this.load();
+    const data = cloneData(await this.load());
+    const background = normalizeBackgroundSettings(data.settings.background);
+
+    if (background.type === "image" && !background.image && background.imageKey) {
+      background.image = await backgroundAssetStorage.load(background.imageKey);
+    }
+
+    data.settings.background = background;
     return JSON.stringify(data, null, 2);
   },
 
   async import(data) {
-    return this.save(normalizeData(data));
+    return this.save(
+      normalizeData({
+        ...data,
+        updatedAt: nowIso(),
+      }),
+    );
   },
 };
 
@@ -317,6 +471,10 @@ const state = {
   pendingUndo: null,
   toastTimer: 0,
   toastAction: null,
+  backgroundDraft: null,
+  backgroundObjectUrl: "",
+  backgroundSignature: "",
+  backgroundLoadToken: 0,
 };
 
 const elements = {};
@@ -332,6 +490,7 @@ async function init() {
 }
 
 function cacheElements() {
+  elements.backgroundButton = document.querySelector("#backgroundButton");
   elements.editModeButton = document.querySelector("#editModeButton");
   elements.editToolbar = document.querySelector("#editToolbar");
   elements.doneEditButton = document.querySelector("#doneEditButton");
@@ -360,12 +519,20 @@ function cacheElements() {
   elements.siteNameInput = document.querySelector("#siteNameInput");
   elements.siteUrlInput = document.querySelector("#siteUrlInput");
   elements.siteIconInput = document.querySelector("#siteIconInput");
+  elements.backgroundForm = document.querySelector("#backgroundForm");
+  elements.backgroundChoiceButtons = Array.from(document.querySelectorAll("[data-background-choice]"));
+  elements.backgroundPreview = document.querySelector("#backgroundPreview");
+  elements.backgroundPreviewText = document.querySelector("#backgroundPreviewText");
+  elements.backgroundImageInput = document.querySelector("#backgroundImageInput");
+  elements.uploadBackgroundImageButton = document.querySelector("#uploadBackgroundImageButton");
+  elements.clearBackgroundImageButton = document.querySelector("#clearBackgroundImageButton");
   elements.toast = document.querySelector("#toast");
   elements.toastMessage = document.querySelector("#toastMessage");
   elements.toastAction = document.querySelector("#toastAction");
 }
 
 function bindEvents() {
+  elements.backgroundButton.addEventListener("click", openBackgroundModal);
   elements.editModeButton.addEventListener("click", () => setEditMode(!state.isEditing));
   elements.doneEditButton.addEventListener("click", () => setEditMode(false));
   elements.exportConfigButton.addEventListener("click", handleExport);
@@ -391,6 +558,15 @@ function bindEvents() {
   elements.groupForm.addEventListener("submit", handleGroupSubmit);
   elements.deleteGroupButton.addEventListener("click", handleDeleteGroup);
   elements.siteForm.addEventListener("submit", handleSiteSubmit);
+  elements.backgroundForm.addEventListener("submit", handleBackgroundSubmit);
+  elements.backgroundImageInput.addEventListener("change", handleBackgroundImageChange);
+  elements.uploadBackgroundImageButton.addEventListener("click", () =>
+    elements.backgroundImageInput.click(),
+  );
+  elements.clearBackgroundImageButton.addEventListener("click", handleClearBackgroundImage);
+  elements.backgroundChoiceButtons.forEach((button) => {
+    button.addEventListener("click", () => selectBackgroundChoice(button.dataset.backgroundChoice));
+  });
   elements.toastAction.addEventListener("click", () => {
     if (typeof state.toastAction === "function") {
       state.toastAction();
@@ -422,6 +598,7 @@ function render() {
     return;
   }
   ensureActiveGroup();
+  applyBackground();
   renderEditMode();
   renderSearchEngine();
   renderGroups();
@@ -433,6 +610,136 @@ function ensureActiveGroup() {
   if (!exists) {
     state.activeGroupId = state.data.groups[0]?.id || "";
   }
+}
+
+function getBackgroundSettings() {
+  return normalizeBackgroundSettings(state.data?.settings?.background || DEFAULT_BACKGROUND_SETTINGS);
+}
+
+function toCssUrl(value) {
+  return `url(${JSON.stringify(value)})`;
+}
+
+function getBackgroundSignature(background) {
+  if (background.type !== "image") {
+    return background.type;
+  }
+
+  if (background.imageKey) {
+    return `image:key:${background.imageKey}`;
+  }
+
+  if (background.image) {
+    return `image:inline:${background.image.length}:${background.image.slice(0, 48)}:${background.image.slice(-48)}`;
+  }
+
+  return "image:empty";
+}
+
+function clearBodyBackgroundImage() {
+  document.body.style.removeProperty("--custom-background-image");
+  if (state.backgroundObjectUrl) {
+    URL.revokeObjectURL(state.backgroundObjectUrl);
+    state.backgroundObjectUrl = "";
+  }
+}
+
+function setBodyBackgroundImageUrl(imageUrl) {
+  document.body.style.setProperty("--custom-background-image", toCssUrl(imageUrl));
+  if (state.backgroundObjectUrl && state.backgroundObjectUrl !== imageUrl) {
+    URL.revokeObjectURL(state.backgroundObjectUrl);
+  }
+  state.backgroundObjectUrl = imageUrl.startsWith("blob:") ? imageUrl : "";
+}
+
+async function createBackgroundObjectUrl(image) {
+  if (image instanceof Blob) {
+    return URL.createObjectURL(image);
+  }
+
+  const source = normalizeText(image);
+  if (!source) {
+    return "";
+  }
+
+  if (!source.startsWith("data:")) {
+    return source;
+  }
+
+  const response = await fetch(source);
+  const blob = await response.blob();
+  return URL.createObjectURL(blob);
+}
+
+function applyBackground() {
+  const background = getBackgroundSettings();
+  const signature = getBackgroundSignature(background);
+  document.body.dataset.background = background.type;
+
+  if (signature === state.backgroundSignature) {
+    return;
+  }
+
+  state.backgroundSignature = signature;
+  state.backgroundLoadToken += 1;
+  const loadToken = state.backgroundLoadToken;
+
+  if (background.type !== "image") {
+    clearBodyBackgroundImage();
+    return;
+  }
+
+  if (background.image) {
+    createBackgroundObjectUrl(background.image)
+      .then((imageUrl) => {
+        if (loadToken === state.backgroundLoadToken && state.backgroundSignature === signature && imageUrl) {
+          setBodyBackgroundImageUrl(imageUrl);
+        } else if (imageUrl.startsWith("blob:")) {
+          URL.revokeObjectURL(imageUrl);
+        }
+      })
+      .catch((error) => {
+        console.warn("Failed to prepare background image.", error);
+        clearBodyBackgroundImage();
+      });
+    return;
+  }
+
+  if (!background.imageKey) {
+    clearBodyBackgroundImage();
+    return;
+  }
+
+  const imageKey = background.imageKey;
+  backgroundAssetStorage
+    .load(imageKey)
+    .then((image) => {
+      const latestBackground = getBackgroundSettings();
+      if (
+        loadToken !== state.backgroundLoadToken ||
+        state.backgroundSignature !== signature ||
+        latestBackground.type !== "image" ||
+        latestBackground.imageKey !== imageKey
+      ) {
+        return;
+      }
+
+      if (image) {
+        return createBackgroundObjectUrl(image).then((imageUrl) => {
+          if (loadToken === state.backgroundLoadToken && state.backgroundSignature === signature && imageUrl) {
+            setBodyBackgroundImageUrl(imageUrl);
+          } else if (imageUrl.startsWith("blob:")) {
+            URL.revokeObjectURL(imageUrl);
+          }
+        });
+      } else {
+        clearBodyBackgroundImage();
+      }
+    })
+    .catch((error) => {
+      console.warn("Failed to load saved background image.", error);
+      clearBodyBackgroundImage();
+    });
 }
 
 function renderEditMode() {
@@ -1107,12 +1414,14 @@ function closeModal() {
   elements.modalBackdrop.hidden = true;
   elements.editModal.hidden = true;
   elements.editModal.setAttribute("aria-hidden", "true");
+  state.backgroundDraft = null;
 }
 
 function openGroupModal(group) {
   elements.modalTitle.textContent = group ? "编辑分组" : "新增分组";
   elements.groupForm.hidden = false;
   elements.siteForm.hidden = true;
+  elements.backgroundForm.hidden = true;
   elements.groupIdInput.value = group?.id || "";
   elements.groupNameInput.value = group?.name || "";
   elements.deleteGroupButton.hidden = !group;
@@ -1124,6 +1433,7 @@ function openSiteModal(site, groupId) {
   elements.modalTitle.textContent = site ? "编辑网页" : "新增网页";
   elements.groupForm.hidden = true;
   elements.siteForm.hidden = false;
+  elements.backgroundForm.hidden = true;
   renderSiteGroupOptions(site?.groupId || groupId || state.activeGroupId);
   elements.siteIdInput.value = site?.id || "";
   elements.siteNameInput.value = site?.name || "";
@@ -1131,6 +1441,70 @@ function openSiteModal(site, groupId) {
   elements.siteIconInput.value = site?.icon || "";
   openModal();
   elements.siteNameInput.focus();
+}
+
+async function openBackgroundModal() {
+  elements.modalTitle.textContent = "设置背景";
+  elements.groupForm.hidden = true;
+  elements.siteForm.hidden = true;
+  elements.backgroundForm.hidden = false;
+  state.backgroundDraft = { ...getBackgroundSettings() };
+
+  if (state.backgroundDraft.type === "image" && !state.backgroundDraft.image && state.backgroundDraft.imageKey) {
+    state.backgroundDraft.image = await backgroundAssetStorage.load(state.backgroundDraft.imageKey).catch((error) => {
+      console.warn("Failed to load background image for preview.", error);
+      return "";
+    });
+  }
+
+  renderBackgroundChoices();
+  openModal();
+  elements.backgroundChoiceButtons[0]?.focus();
+}
+
+function renderBackgroundChoices() {
+  const draft = state.backgroundDraft || getBackgroundSettings();
+  const previewType = draft.type === "image" && !draft.image ? "white" : draft.type;
+
+  elements.backgroundChoiceButtons.forEach((button) => {
+    const isActive = button.dataset.backgroundChoice === draft.type;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-checked", String(isActive));
+  });
+
+  elements.backgroundPreview.dataset.preview = previewType;
+  elements.backgroundPreview.style.backgroundImage =
+    draft.type === "image" && draft.image ? toCssUrl(draft.image) : "";
+
+  if (draft.type === "black") {
+    elements.backgroundPreviewText.textContent = "黑色背景";
+  } else if (draft.type === "image") {
+    elements.backgroundPreviewText.textContent = draft.image ? "自定义图片" : "未选择图片";
+  } else {
+    elements.backgroundPreviewText.textContent = "白色背景";
+  }
+
+  elements.uploadBackgroundImageButton.textContent = draft.image ? "更换图片" : "选择图片";
+  elements.clearBackgroundImageButton.hidden = !draft.image;
+}
+
+function selectBackgroundChoice(type) {
+  if (!BACKGROUND_TYPES.has(type)) {
+    return;
+  }
+
+  if (!state.backgroundDraft) {
+    state.backgroundDraft = { ...getBackgroundSettings() };
+  }
+
+  state.backgroundDraft.type = type;
+  if (type !== "image") {
+    state.backgroundDraft.image = "";
+  } else if (!state.backgroundDraft.image) {
+    elements.backgroundImageInput.click();
+  }
+
+  renderBackgroundChoices();
 }
 
 function renderSiteGroupOptions(selectedGroupId) {
@@ -1243,6 +1617,73 @@ async function handleSiteSubmit(event) {
   await saveData(nextData);
   closeModal();
   showToast("网页已保存。");
+}
+
+async function handleBackgroundSubmit(event) {
+  event.preventDefault();
+  const background = normalizeBackgroundSettings(state.backgroundDraft || getBackgroundSettings());
+
+  if (state.backgroundDraft?.type === "image" && !state.backgroundDraft.image) {
+    showToast("请先选择一张背景图片。");
+    return;
+  }
+
+  const nextData = cloneData(state.data);
+  nextData.settings.background = background;
+
+  try {
+    await saveData(nextData);
+    closeModal();
+    showToast("背景已保存。");
+  } catch (error) {
+    console.error(error);
+    showToast("背景保存失败，浏览器可能拒绝了本地存储。");
+  }
+}
+
+async function handleBackgroundImageChange(event) {
+  const [file] = event.target.files;
+  if (!file) {
+    return;
+  }
+
+  try {
+    if (!file.type.startsWith("image/")) {
+      showToast("请选择图片文件。");
+      return;
+    }
+
+    if (file.size > MAX_BACKGROUND_IMAGE_BYTES) {
+      showToast("图片过大，请选择 3MB 以内的图片。");
+      return;
+    }
+
+    const image = await readFileAsDataUrl(file);
+    state.backgroundDraft = {
+      type: "image",
+      image,
+    };
+    renderBackgroundChoices();
+  } catch (error) {
+    console.error(error);
+    showToast("读取图片失败，请换一张图片试试。");
+  } finally {
+    event.target.value = "";
+  }
+}
+
+function handleClearBackgroundImage() {
+  state.backgroundDraft = { ...DEFAULT_BACKGROUND_SETTINGS };
+  renderBackgroundChoices();
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result || "")));
+    reader.addEventListener("error", () => reject(reader.error));
+    reader.readAsDataURL(file);
+  });
 }
 
 async function deleteSiteWithUndo(siteId) {
