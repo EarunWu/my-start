@@ -393,6 +393,65 @@ h1 {
   color: #9097a1;
 }
 
+.json-panel {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(105, 113, 125, 0.18);
+  border-radius: var(--radius-card);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-card);
+  text-align: left;
+}
+
+.json-panel-header {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 10px 0 13px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted-strong);
+  font-size: 0.82rem;
+  font-weight: 780;
+}
+
+.json-copy-button {
+  min-height: 28px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-card);
+  background: var(--surface-soft);
+  color: var(--text);
+  padding: 0 10px;
+  font-size: 0.78rem;
+  font-weight: 720;
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.json-copy-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(105, 113, 125, 0.28);
+  background: var(--surface);
+}
+
+.json-output {
+  height: calc(100% - 40px);
+  margin: 0;
+  overflow: auto;
+  padding: 13px 15px;
+  color: var(--text);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  tab-size: 2;
+  white-space: pre;
+}
+
 .group-tabs {
   width: min(720px, 100%);
   display: flex;
@@ -484,6 +543,10 @@ h1 {
   width: min(760px, 100%);
   height: calc((var(--site-card-height) * 3) + (var(--site-grid-gap) * 2));
   margin: 30px auto 0;
+}
+
+.site-section.is-json-active {
+  height: calc((var(--site-card-height) * 6) + (var(--site-grid-gap) * 4));
 }
 
 .site-grid {

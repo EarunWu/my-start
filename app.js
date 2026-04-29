@@ -475,6 +475,7 @@ const state = {
   backgroundObjectUrl: "",
   backgroundSignature: "",
   backgroundLoadToken: 0,
+  formattedJson: "",
 };
 
 const elements = {};
@@ -502,7 +503,11 @@ function cacheElements() {
   elements.searchEngineIcon = document.querySelector("#searchEngineIcon");
   elements.searchEngineMenu = document.querySelector("#searchEngineMenu");
   elements.searchInput = document.querySelector("#searchInput");
+  elements.jsonPanel = document.querySelector("#jsonPanel");
+  elements.jsonOutput = document.querySelector("#jsonOutput");
+  elements.copyJsonButton = document.querySelector("#copyJsonButton");
   elements.groupTabs = document.querySelector("#groupTabs");
+  elements.siteSection = document.querySelector("#siteSection");
   elements.siteGrid = document.querySelector("#siteGrid");
   elements.emptyState = document.querySelector("#emptyState");
   elements.modalBackdrop = document.querySelector("#modalBackdrop");
@@ -548,10 +553,8 @@ function bindEvents() {
   elements.siteGrid.addEventListener("dragleave", handleSiteGridDragLeave);
   elements.siteGrid.addEventListener("drop", handleSiteGridDrop);
 
-  elements.searchInput.addEventListener("input", () => {
-    state.query = elements.searchInput.value.trim();
-    renderSites();
-  });
+  elements.searchInput.addEventListener("input", handleSearchInput);
+  elements.copyJsonButton.addEventListener("click", copyFormattedJson);
 
   elements.closeModalButton.addEventListener("click", closeModal);
   elements.modalBackdrop.addEventListener("click", closeModal);
@@ -601,6 +604,7 @@ function render() {
   applyBackground();
   renderEditMode();
   renderSearchEngine();
+  renderJsonPanel();
   renderGroups();
   renderSites();
 }
@@ -807,6 +811,55 @@ function renderSearchEngineMenu(activeEngineId) {
   });
 }
 
+function parseJsonPreview(value) {
+  const text = value.trim();
+  if (!text || !/^[{[]/.test(text)) {
+    return "";
+  }
+
+  try {
+    const parsed = JSON.parse(text);
+    return JSON.stringify(parsed, null, 2);
+  } catch {
+    return "";
+  }
+}
+
+function handleSearchInput() {
+  const formattedJson = parseJsonPreview(elements.searchInput.value);
+  state.formattedJson = formattedJson;
+  state.query = formattedJson ? "" : elements.searchInput.value.trim();
+  renderJsonPanel();
+  renderSites();
+}
+
+function renderJsonPanel() {
+  if (!state.formattedJson) {
+    elements.jsonPanel.hidden = true;
+    elements.jsonOutput.textContent = "";
+    elements.siteSection.classList.remove("is-json-active");
+    return;
+  }
+
+  elements.jsonPanel.hidden = false;
+  elements.jsonOutput.textContent = state.formattedJson;
+  elements.siteSection.classList.add("is-json-active");
+}
+
+async function copyFormattedJson() {
+  if (!state.formattedJson) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(state.formattedJson);
+    showToast("已复制格式化 JSON。");
+  } catch (error) {
+    console.error(error);
+    showToast("复制失败，请手动选择内容。");
+  }
+}
+
 function toggleSearchEngineMenu(event) {
   event.stopPropagation();
   const willOpen = elements.searchEngineMenu.hidden;
@@ -855,6 +908,7 @@ function renderGroups() {
     button.addEventListener("click", () => {
       state.activeGroupId = group.id;
       state.query = "";
+      state.formattedJson = "";
       elements.searchInput.value = "";
       render();
     });
@@ -920,6 +974,14 @@ function shouldShowAddSiteCard() {
 }
 
 function renderSites() {
+  if (state.formattedJson) {
+    elements.siteGrid.hidden = true;
+    elements.emptyState.hidden = true;
+    elements.siteGrid.replaceChildren();
+    return;
+  }
+
+  elements.siteGrid.hidden = false;
   elements.siteGrid.replaceChildren();
   const sites = getVisibleSites();
 
@@ -1200,6 +1262,11 @@ function populateSiteIcon(container, site) {
 
 function handleSearchSubmit(event) {
   event.preventDefault();
+  if (state.formattedJson) {
+    showToast("JSON 已格式化。");
+    return;
+  }
+
   const query = state.query.trim();
   if (!query) {
     elements.searchInput.focus();
@@ -1768,6 +1835,7 @@ async function handleImport(event) {
     state.data = await storage.import(imported);
     state.activeGroupId = state.data.groups[0]?.id || "";
     state.query = "";
+    state.formattedJson = "";
     state.pendingUndo = null;
     elements.searchInput.value = "";
     closeModal();

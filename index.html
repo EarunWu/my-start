@@ -61,13 +61,20 @@
               <img id="searchEngineIcon" src="" alt="">
             </button>
             <div class="search-engine-menu" id="searchEngineMenu" hidden></div>
-            <input id="searchInput" type="search" autocomplete="off" placeholder="搜索网站或输入关键词...">
+            <input id="searchInput" type="search" autocomplete="off" placeholder="搜索网站、关键词，或粘贴 JSON...">
           </div>
         </form>
 
         <nav class="group-tabs" id="groupTabs" aria-label="导航分组"></nav>
 
-        <section class="site-section" aria-live="polite">
+        <section class="site-section" id="siteSection" aria-live="polite">
+          <section class="json-panel" id="jsonPanel" hidden>
+            <header class="json-panel-header">
+              <span id="jsonPanelTitle">JSON</span>
+              <button class="json-copy-button" id="copyJsonButton" type="button">复制</button>
+            </header>
+            <pre class="json-output"><code id="jsonOutput"></code></pre>
+          </section>
           <div class="site-grid" id="siteGrid"></div>
           <p class="empty-state" id="emptyState" hidden></p>
         </section>
