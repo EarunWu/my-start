@@ -122,7 +122,10 @@
         <input id="siteUrlInput" type="text" placeholder="https://github.com" required>
 
         <label for="siteIconInput">图标链接</label>
-        <input id="siteIconInput" type="text" placeholder="可选，留空会显示首字母">
+        <div class="input-action-row">
+          <input id="siteIconInput" type="text" placeholder="可选，留空会显示首字母">
+          <button class="secondary-button inline-action-button" id="fetchSiteIconButton" type="button">获取图标</button>
+        </div>
 
         <div class="modal-actions">
           <button class="primary-button" type="submit">保存网页</button>

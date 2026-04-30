@@ -41,6 +41,8 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 body[data-background="white"] {
@@ -80,6 +82,14 @@ button,
 input,
 select {
   font: inherit;
+}
+
+input,
+select,
+.json-output,
+.json-output * {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 button {
@@ -268,11 +278,9 @@ h1 {
 }
 
 .search-box:focus-within {
-  border-color: rgba(31, 111, 104, 0.42);
-  background: var(--surface);
-  box-shadow:
-    0 0 0 4px rgba(31, 111, 104, 0.1),
-    var(--shadow-soft);
+  border-color: rgba(105, 113, 125, 0.2);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow-soft);
 }
 
 .search-box.is-image-dragover {
@@ -607,9 +615,51 @@ h1 {
   box-shadow: 0 14px 34px rgba(28, 36, 48, 0.12);
 }
 
+.site-card[draggable="true"] {
+  cursor: grab;
+}
+
+.site-card.is-dragging,
+.site-card.is-wiggling.is-dragging {
+  opacity: 0.42;
+  cursor: grabbing;
+  animation: none;
+  transform: scale(0.96);
+}
+
+.site-card.is-dragging:hover {
+  transform: scale(0.96);
+}
+
+.site-card.is-drag-over-before::after,
+.site-card.is-drag-over-after::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  z-index: 1;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--dark);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.78);
+  pointer-events: none;
+}
+
+.site-card.is-drag-over-before::after {
+  left: -9px;
+}
+
+.site-card.is-drag-over-after::after {
+  right: -9px;
+}
+
 .site-card.is-wiggling {
   cursor: pointer;
   animation: wiggle 620ms ease-in-out infinite;
+}
+
+.site-card.is-wiggling[draggable="true"] {
+  cursor: grab;
 }
 
 .site-card.is-wiggling:nth-child(2n) {
@@ -624,9 +674,13 @@ h1 {
   transform: none;
 }
 
+.site-card.is-wiggling.is-dragging:hover {
+  transform: scale(0.96);
+}
+
 .site-icon {
-  width: 38px;
-  height: 38px;
+  width: 46px;
+  height: 46px;
   display: grid;
   place-items: center;
   border: 0;
@@ -650,8 +704,8 @@ button.site-icon:hover {
 }
 
 .site-icon img {
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   object-fit: contain;
 }
 
@@ -684,16 +738,26 @@ button.site-icon:hover {
   z-index: 2;
   width: 24px;
   height: 24px;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 2px solid #ffffff;
   border-radius: 999px;
   background: var(--danger);
   color: #ffffff;
-  font-size: 1rem;
+  font-size: 0;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(178, 64, 54, 0.28);
+}
+
+.site-delete-button::before {
+  content: "×";
+  display: block;
+  color: #ffffff;
+  font-size: 17px;
   font-weight: 800;
   line-height: 1;
-  box-shadow: 0 8px 18px rgba(178, 64, 54, 0.28);
+  transform: translateY(-0.5px);
 }
 
 .site-delete-button:hover {
@@ -710,8 +774,8 @@ button.site-icon:hover {
 }
 
 .add-site-card .plus-mark {
-  width: 38px;
-  height: 38px;
+  width: 46px;
+  height: 46px;
   display: grid;
   place-items: center;
   border: 1px solid var(--line);
@@ -811,6 +875,17 @@ button.site-icon:hover {
 .modal-form select:focus {
   border-color: rgba(105, 113, 125, 0.46);
   box-shadow: 0 0 0 3px rgba(32, 38, 49, 0.08);
+}
+
+.input-action-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.inline-action-button {
+  min-height: 42px;
+  white-space: nowrap;
 }
 
 .modal-actions {
@@ -1121,13 +1196,13 @@ button.site-icon:hover {
 
   .site-icon,
   .add-site-card .plus-mark {
-    width: 30px;
-    height: 30px;
+    width: 36px;
+    height: 36px;
   }
 
   .site-icon img {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
   }
 
   .site-name {

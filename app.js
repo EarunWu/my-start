@@ -6,6 +6,8 @@ const NAVIGATION_PRESET_ID = "personal-a-v1";
 const ASSET_DB_NAME = "my-start-assets-v1";
 const ASSET_STORE_NAME = "assets";
 const BACKGROUND_ASSET_KEY = "background-image";
+const ICON_CACHE_PREFIX = "site-icon:";
+const ICON_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const FAVICON_SERVICE_TEMPLATE = "https://www.google.com/s2/favicons?domain={domain}&sz=64";
 const BACKGROUND_TYPES = new Set(["white", "black", "image"]);
 const DEFAULT_BACKGROUND_SETTINGS = {
@@ -349,6 +351,80 @@ const backgroundAssetStorage = {
   },
 };
 
+function createIconCacheKey(iconUrl) {
+  return `${ICON_CACHE_PREFIX}${encodeURIComponent(iconUrl)}`;
+}
+
+function normalizeIconCacheEntry(entry, iconUrl) {
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+
+  if (entry.sourceUrl !== iconUrl || !entry.dataUrl || !entry.fetchedAt) {
+    return null;
+  }
+
+  return entry;
+}
+
+function readBlobAsDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result || "")));
+    reader.addEventListener("error", () => reject(reader.error));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function fetchIconAsDataUrl(iconUrl) {
+  const response = await fetch(iconUrl);
+  if (!response.ok) {
+    throw new Error(`Icon request failed: ${response.status}`);
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType && !contentType.toLowerCase().startsWith("image/")) {
+    throw new Error("Icon response is not an image.");
+  }
+
+  const blob = await response.blob();
+  if (blob.type && !blob.type.toLowerCase().startsWith("image/")) {
+    throw new Error("Icon blob is not an image.");
+  }
+
+  return readBlobAsDataUrl(blob);
+}
+
+const siteIconCacheStorage = {
+  async load(iconUrl) {
+    if (!iconUrl) {
+      return null;
+    }
+
+    const entry = await withAssetStore("readonly", (store) => store.get(createIconCacheKey(iconUrl)));
+    return normalizeIconCacheEntry(entry, iconUrl);
+  },
+
+  async save(iconUrl, dataUrl) {
+    const entry = {
+      sourceUrl: iconUrl,
+      dataUrl,
+      fetchedAt: Date.now(),
+    };
+    await withAssetStore("readwrite", (store) => store.put(entry, createIconCacheKey(iconUrl)));
+    return entry;
+  },
+
+  isFresh(entry) {
+    return Boolean(entry && Date.now() - Number(entry.fetchedAt) < ICON_CACHE_TTL_MS);
+  },
+
+  async refresh(iconUrl) {
+    const dataUrl = await fetchIconAsDataUrl(iconUrl);
+    return this.save(iconUrl, dataUrl);
+  },
+};
+
 async function persistBackgroundAsset(data) {
   const nextData = cloneData(data);
   const background = normalizeBackgroundSettings(nextData.settings.background);
@@ -476,6 +552,11 @@ const state = {
   backgroundSignature: "",
   backgroundLoadToken: 0,
   formattedJson: "",
+  draggedSiteId: "",
+  didDragSite: false,
+  dragOverSiteId: "",
+  dragInsertAfter: false,
+  suppressSiteClick: false,
 };
 
 const elements = {};
@@ -488,6 +569,13 @@ async function init() {
   state.data = await storage.load();
   state.activeGroupId = state.data.groups[0]?.id || "";
   render();
+  focusSearchInput();
+}
+
+function focusSearchInput() {
+  window.requestAnimationFrame(() => {
+    elements.searchInput.focus({ preventScroll: true });
+  });
 }
 
 function cacheElements() {
@@ -524,6 +612,7 @@ function cacheElements() {
   elements.siteNameInput = document.querySelector("#siteNameInput");
   elements.siteUrlInput = document.querySelector("#siteUrlInput");
   elements.siteIconInput = document.querySelector("#siteIconInput");
+  elements.fetchSiteIconButton = document.querySelector("#fetchSiteIconButton");
   elements.backgroundForm = document.querySelector("#backgroundForm");
   elements.backgroundChoiceButtons = Array.from(document.querySelectorAll("[data-background-choice]"));
   elements.backgroundPreview = document.querySelector("#backgroundPreview");
@@ -561,6 +650,7 @@ function bindEvents() {
   elements.groupForm.addEventListener("submit", handleGroupSubmit);
   elements.deleteGroupButton.addEventListener("click", handleDeleteGroup);
   elements.siteForm.addEventListener("submit", handleSiteSubmit);
+  elements.fetchSiteIconButton.addEventListener("click", handleFetchSiteIcon);
   elements.backgroundForm.addEventListener("submit", handleBackgroundSubmit);
   elements.backgroundImageInput.addEventListener("change", handleBackgroundImageChange);
   elements.uploadBackgroundImageButton.addEventListener("click", () =>
@@ -757,8 +847,18 @@ function setEditMode(isEditing) {
   state.isEditing = isEditing;
   if (!isEditing) {
     closeModal();
+    resetSiteDragState();
   }
   render();
+}
+
+function resetSiteDragState() {
+  state.draggedSiteId = "";
+  state.didDragSite = false;
+  state.dragOverSiteId = "";
+  state.dragInsertAfter = false;
+  state.suppressSiteClick = false;
+  elements.siteGrid?.classList.remove("is-link-dragover");
 }
 
 function getCurrentSearchEngine() {
@@ -968,9 +1068,14 @@ function shouldShowAddSiteCard() {
   return (
     state.isEditing &&
     !state.query &&
+    !state.formattedJson &&
     state.activeGroupId &&
     countSitesInGroup(state.data, state.activeGroupId) < MAX_SITES_PER_GROUP
   );
+}
+
+function canSortSites() {
+  return state.isEditing && !state.query && !state.formattedJson && Boolean(state.activeGroupId);
 }
 
 function renderSites() {
@@ -1009,10 +1114,88 @@ function renderSites() {
   elements.emptyState.textContent = "这个分组还没有网页，进入编辑模式后点击 + 添加。";
 }
 
+function isInternalSiteDrag() {
+  return Boolean(state.draggedSiteId);
+}
+
+function clearSiteDropIndicators() {
+  elements.siteGrid
+    .querySelectorAll(".is-drag-over-before, .is-drag-over-after")
+    .forEach((card) => {
+      card.classList.remove("is-drag-over-before", "is-drag-over-after");
+    });
+}
+
+function getDragInsertAfter(event, targetCard) {
+  const rect = targetCard.getBoundingClientRect();
+  return event.clientX > rect.left + rect.width / 2;
+}
+
+function updateSiteDropIndicator(targetCard, insertAfter) {
+  clearSiteDropIndicators();
+  if (!targetCard || targetCard.dataset.siteId === state.draggedSiteId) {
+    state.dragOverSiteId = "";
+    state.dragInsertAfter = false;
+    return;
+  }
+
+  state.dragOverSiteId = targetCard.dataset.siteId || "";
+  state.dragInsertAfter = insertAfter;
+  targetCard.classList.add(insertAfter ? "is-drag-over-after" : "is-drag-over-before");
+}
+
+async function reorderCurrentGroupSites(draggedSiteId, targetSiteId = "", insertAfter = true) {
+  if (!canSortSites() || !draggedSiteId) {
+    return false;
+  }
+
+  const currentGroupSites = state.data.sites.filter((site) => site.groupId === state.activeGroupId);
+  const draggedSite = currentGroupSites.find((site) => site.id === draggedSiteId);
+  if (!draggedSite || draggedSite.id === targetSiteId) {
+    return false;
+  }
+
+  const reorderedGroupSites = currentGroupSites.filter((site) => site.id !== draggedSiteId);
+  let insertIndex = reorderedGroupSites.length;
+
+  if (targetSiteId) {
+    const targetIndex = reorderedGroupSites.findIndex((site) => site.id === targetSiteId);
+    if (targetIndex < 0) {
+      return false;
+    }
+    insertIndex = targetIndex + (insertAfter ? 1 : 0);
+  }
+
+  reorderedGroupSites.splice(insertIndex, 0, draggedSite);
+
+  if (currentGroupSites.every((site, index) => site.id === reorderedGroupSites[index]?.id)) {
+    return false;
+  }
+
+  const nextData = cloneData(state.data);
+  const reorderedQueue = reorderedGroupSites.map((site) => cloneData(site));
+  nextData.sites = nextData.sites.map((site) => {
+    if (site.groupId !== state.activeGroupId) {
+      return site;
+    }
+    return reorderedQueue.shift();
+  });
+
+  await saveData(nextData);
+  return true;
+}
+
 function handleSiteGridDragEnter(event) {
   if (!state.isEditing) {
     return;
   }
+
+  if (isInternalSiteDrag()) {
+    event.preventDefault();
+    elements.siteGrid.classList.remove("is-link-dragover");
+    return;
+  }
+
   event.preventDefault();
   elements.siteGrid.classList.add("is-link-dragover");
 }
@@ -1021,7 +1204,16 @@ function handleSiteGridDragOver(event) {
   if (!state.isEditing) {
     return;
   }
+
   event.preventDefault();
+  if (isInternalSiteDrag()) {
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = "move";
+    }
+    elements.siteGrid.classList.remove("is-link-dragover");
+    return;
+  }
+
   if (event.dataTransfer) {
     event.dataTransfer.dropEffect = "copy";
   }
@@ -1033,10 +1225,23 @@ function handleSiteGridDragLeave(event) {
     return;
   }
   elements.siteGrid.classList.remove("is-link-dragover");
+  if (isInternalSiteDrag()) {
+    clearSiteDropIndicators();
+  }
 }
 
 async function handleSiteGridDrop(event) {
   if (!state.isEditing) {
+    return;
+  }
+
+  if (isInternalSiteDrag()) {
+    event.preventDefault();
+    elements.siteGrid.classList.remove("is-link-dragover");
+    clearSiteDropIndicators();
+    const draggedSiteId = state.draggedSiteId;
+    await reorderCurrentGroupSites(draggedSiteId);
+    finishSiteCardDrag();
     return;
   }
 
@@ -1159,6 +1364,9 @@ function getDroppedBookmarkTitle(url, dataTransfer) {
 function getFaviconUrl(url) {
   try {
     const domain = new URL(url).hostname;
+    if (!domain) {
+      return "";
+    }
     return FAVICON_SERVICE_TEMPLATE.replace("{domain}", encodeURIComponent(domain));
   } catch {
     return "";
@@ -1175,7 +1383,22 @@ function createSiteCard(site) {
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
     card.setAttribute("aria-label", `编辑 ${site.name}`);
-    card.addEventListener("click", () => openSiteModal(site, site.groupId));
+    card.dataset.siteId = site.id;
+    if (canSortSites()) {
+      card.draggable = true;
+      card.addEventListener("dragstart", (event) => handleSiteCardDragStart(event, site.id));
+      card.addEventListener("dragover", (event) => handleSiteCardDragOver(event, card));
+      card.addEventListener("dragleave", (event) => handleSiteCardDragLeave(event, card));
+      card.addEventListener("drop", (event) => handleSiteCardDrop(event, card));
+      card.addEventListener("dragend", handleSiteCardDragEnd);
+    }
+    card.addEventListener("click", (event) => {
+      if (state.suppressSiteClick) {
+        event.preventDefault();
+        return;
+      }
+      openSiteModal(site, site.groupId);
+    });
     card.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
@@ -1192,11 +1415,16 @@ function createSiteCard(site) {
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
     deleteButton.className = "site-delete-button";
+    deleteButton.draggable = false;
     deleteButton.textContent = "×";
     deleteButton.setAttribute("aria-label", `删除 ${site.name}`);
     deleteButton.addEventListener("click", (event) => {
       event.stopPropagation();
       deleteSiteWithUndo(site.id);
+    });
+    deleteButton.addEventListener("dragstart", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
     });
     card.append(deleteButton);
   }
@@ -1240,9 +1468,115 @@ function createAddSiteCard() {
   return button;
 }
 
+function handleSiteCardDragStart(event, siteId) {
+  if (!canSortSites()) {
+    event.preventDefault();
+    return;
+  }
+
+  state.draggedSiteId = siteId;
+  state.didDragSite = true;
+  state.suppressSiteClick = true;
+  state.dragOverSiteId = "";
+  state.dragInsertAfter = false;
+
+  event.currentTarget.classList.add("is-dragging");
+  elements.siteGrid.classList.remove("is-link-dragover");
+
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/x-my-start-site-id", siteId);
+    event.dataTransfer.setData("text/plain", siteId);
+  }
+}
+
+function handleSiteCardDragOver(event, card) {
+  if (!isInternalSiteDrag()) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = "move";
+  }
+
+  updateSiteDropIndicator(card, getDragInsertAfter(event, card));
+}
+
+function handleSiteCardDragLeave(event, card) {
+  if (!isInternalSiteDrag() || card.contains(event.relatedTarget)) {
+    return;
+  }
+
+  card.classList.remove("is-drag-over-before", "is-drag-over-after");
+}
+
+async function handleSiteCardDrop(event, card) {
+  if (!isInternalSiteDrag()) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  const draggedSiteId = state.draggedSiteId;
+  const targetSiteId = card.dataset.siteId || "";
+  const insertAfter = getDragInsertAfter(event, card);
+  clearSiteDropIndicators();
+  await reorderCurrentGroupSites(draggedSiteId, targetSiteId, insertAfter);
+  finishSiteCardDrag();
+}
+
+function handleSiteCardDragEnd() {
+  finishSiteCardDrag();
+}
+
+function finishSiteCardDrag() {
+  state.draggedSiteId = "";
+  state.dragOverSiteId = "";
+  state.dragInsertAfter = false;
+  elements.siteGrid.classList.remove("is-link-dragover");
+  clearSiteDropIndicators();
+  elements.siteGrid.querySelectorAll(".is-dragging").forEach((card) => {
+    card.classList.remove("is-dragging");
+  });
+
+  window.setTimeout(() => {
+    state.didDragSite = false;
+    state.suppressSiteClick = false;
+  }, 120);
+}
+
 function populateSiteIcon(container, site) {
   const fallback = document.createElement("span");
   fallback.textContent = site.name.slice(0, 1).toUpperCase();
+  const renderToken = createId("icon-render");
+  container.dataset.iconRenderToken = renderToken;
+
+  function isCurrentRender() {
+    return container.isConnected && container.dataset.iconRenderToken === renderToken;
+  }
+
+  function showFallback() {
+    if (!isCurrentRender()) {
+      return;
+    }
+    image?.remove();
+    if (!container.contains(fallback)) {
+      container.append(fallback);
+    }
+  }
+
+  function setImageSource(source) {
+    if (!isCurrentRender() || !source) {
+      return;
+    }
+    fallback.remove();
+    if (!container.contains(image)) {
+      container.append(image);
+    }
+    image.src = source;
+  }
 
   if (!site.icon) {
     container.append(fallback);
@@ -1250,14 +1584,38 @@ function populateSiteIcon(container, site) {
   }
 
   const image = document.createElement("img");
-  image.src = site.icon;
   image.alt = "";
   image.loading = "lazy";
-  image.addEventListener("error", () => {
-    image.remove();
-    container.append(fallback);
-  });
-  container.append(image);
+  image.addEventListener("error", showFallback);
+  setImageSource(site.icon);
+
+  siteIconCacheStorage
+    .load(site.icon)
+    .then((entry) => {
+      if (!isCurrentRender()) {
+        return null;
+      }
+
+      if (entry?.dataUrl) {
+        setImageSource(entry.dataUrl);
+      }
+
+      if (siteIconCacheStorage.isFresh(entry)) {
+        return null;
+      }
+
+      return siteIconCacheStorage.refresh(site.icon);
+    })
+    .then((entry) => {
+      if (entry?.dataUrl) {
+        setImageSource(entry.dataUrl);
+      }
+    })
+    .catch(() => {
+      if (image.src !== site.icon && !container.contains(image)) {
+        setImageSource(site.icon);
+      }
+    });
 }
 
 function handleSearchSubmit(event) {
@@ -1684,6 +2042,21 @@ async function handleSiteSubmit(event) {
   await saveData(nextData);
   closeModal();
   showToast("网页已保存。");
+}
+
+function handleFetchSiteIcon() {
+  const url = normalizeUrl(elements.siteUrlInput.value);
+  const icon = getFaviconUrl(url);
+
+  if (!icon) {
+    showToast("请先填写有效的网页链接。");
+    elements.siteUrlInput.focus();
+    return;
+  }
+
+  elements.siteIconInput.value = icon;
+  showToast("已获取图标链接。");
+  elements.siteIconInput.focus();
 }
 
 async function handleBackgroundSubmit(event) {
