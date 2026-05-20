@@ -80,12 +80,14 @@ body.is-editing {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
 input,
 select,
+textarea,
 .json-output,
 .json-output * {
   user-select: text;
@@ -134,6 +136,7 @@ svg {
   background: rgba(255, 255, 255, 0.78);
   color: var(--muted-strong);
   box-shadow: 0 8px 24px rgba(28, 36, 48, 0.06);
+  text-decoration: none;
   transition:
     transform 160ms ease,
     border-color 160ms ease,
@@ -1062,6 +1065,124 @@ button.site-icon:hover {
   transform: translateY(-1px);
 }
 
+.primary-button:disabled,
+.secondary-button:disabled,
+.danger-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  transform: none;
+}
+
+.converter-shell {
+  place-items: start center;
+  padding-top: 76px;
+}
+
+.converter-panel {
+  width: min(1080px, 100%);
+  min-width: 0;
+  text-align: center;
+}
+
+.converter-panel h1 {
+  margin-bottom: 24px;
+}
+
+.converter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  text-align: left;
+}
+
+.converter-column {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto minmax(360px, 1fr) auto auto;
+  overflow: hidden;
+  border: 1px solid rgba(105, 113, 125, 0.18);
+  border-radius: var(--radius-card);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-card);
+}
+
+.converter-column-header {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.converter-column-header h2 {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 760;
+}
+
+.converter-column-header span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 680;
+  text-align: right;
+}
+
+.converter-textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 360px;
+  resize: vertical;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 15px 16px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.converter-textarea::placeholder {
+  color: #9097a1;
+}
+
+.converter-output {
+  height: auto;
+  min-height: 360px;
+  background: transparent;
+}
+
+.converter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 16px 16px;
+}
+
+.converter-file-button {
+  gap: 7px;
+}
+
+.converter-file-button svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+.converter-file-name {
+  min-height: 20px;
+  margin: -8px 16px 14px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
 .toast {
   position: fixed;
   left: 50%;
@@ -1226,5 +1347,47 @@ button.site-icon:hover {
   .site-delete-button {
     width: 22px;
     height: 22px;
+  }
+
+  .converter-shell {
+    padding-top: 82px;
+  }
+
+  .converter-panel h1 {
+    font-size: 2rem;
+  }
+
+  .converter-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .converter-column {
+    grid-template-rows: auto minmax(280px, 1fr) auto auto;
+  }
+
+  .converter-column-header {
+    min-height: 0;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+    padding: 13px 14px;
+  }
+
+  .converter-column-header span {
+    text-align: left;
+  }
+
+  .converter-textarea,
+  .converter-output {
+    min-height: 280px;
+  }
+
+  .converter-actions {
+    padding: 0 14px 14px;
+  }
+
+  .converter-file-name {
+    margin-right: 14px;
+    margin-left: 14px;
   }
 }
