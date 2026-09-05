@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>My Start · 启程之门</title>
+  <defs>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#7860ce"/>
+      <stop offset="1" stop-color="#624fa4"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="19" fill="url(#violet)"/>
+  <path d="M16 49V28C16 7 48 7 48 28V49H40V28C40 17 24 17 24 28V49Z" fill="#fff"/>
+  <path d="M27 46L42 31" stroke="#c9b7ff" stroke-width="5" stroke-linecap="round"/>
+  <path d="M32 31H42V41" stroke="#c9b7ff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

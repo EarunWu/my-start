@@ -992,8 +992,24 @@ function closeSearchWheel(restoreFocus = false, animate = false) {
 function getSearchWheelSectorPath(index, count) {
   const start = -Math.PI / 2 + (index / count) * Math.PI + 0.014;
   const end = -Math.PI / 2 + ((index + 1) / count) * Math.PI - 0.014;
+  const outerRadius = 150;
+  const innerRadius = 49;
+  const outerTrim = Math.min(12 / outerRadius, (end - start) / 4);
+  const innerTrim = Math.min(7 / innerRadius, (end - start) / 4);
   const point = (radius, angle) => `${(Math.cos(angle) * radius).toFixed(3)} ${(152 + Math.sin(angle) * radius).toFixed(3)}`;
-  return `M ${point(150, start)} A 150 150 0 0 1 ${point(150, end)} L ${point(49, end)} A 49 49 0 0 0 ${point(49, start)} Z`;
+  // Round all four corners in the shared visual and hit-test path.
+  return [
+    `M ${point(outerRadius, start + outerTrim)}`,
+    `A ${outerRadius} ${outerRadius} 0 0 1 ${point(outerRadius, end - outerTrim)}`,
+    `Q ${point(outerRadius, end)} ${point(outerRadius * (1 - outerTrim), end)}`,
+    `L ${point(innerRadius * (1 + innerTrim), end)}`,
+    `Q ${point(innerRadius, end)} ${point(innerRadius, end - innerTrim)}`,
+    `A ${innerRadius} ${innerRadius} 0 0 0 ${point(innerRadius, start + innerTrim)}`,
+    `Q ${point(innerRadius, start)} ${point(innerRadius * (1 + innerTrim), start)}`,
+    `L ${point(outerRadius * (1 - outerTrim), start)}`,
+    `Q ${point(outerRadius, start)} ${point(outerRadius, start + outerTrim)}`,
+    "Z",
+  ].join(" ");
 }
 
 function renderSearchWheel(activeEngineId) {

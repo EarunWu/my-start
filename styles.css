@@ -1257,20 +1257,13 @@ button.site-icon:hover {
 }
 
 .brand-mark {
-  display: grid;
-  place-content: center;
-  grid-auto-flow: column;
+  display: block;
+  flex-shrink: 0;
   width: 38px;
   height: 38px;
-  border-radius: 12px;
-  background: var(--accent);
-  color: white;
-  font-family: Georgia, serif;
-  font-size: 28px;
-  line-height: 1;
+  object-fit: contain;
 }
 
-.brand-mark span { color: #ddd4ff; }
 .brand-dot { color: var(--accent); }
 .header-date { align-self: center; margin-right: 18px; color: var(--muted-strong); font-size: 12px; }
 .welcome-mark { margin-bottom: 18px; color: var(--accent); font-size: 43px; line-height: 1; }
@@ -1278,17 +1271,16 @@ button.site-icon:hover {
 .start-panel h1 { margin-bottom: 18px; font-size: clamp(27px, 3.2vw, 42px); font-weight: 650; letter-spacing: -1.5px; line-height: 1.35; }
 .start-panel h1 span { color: var(--accent); }
 .hero-description { margin-bottom: 32px; color: var(--muted-strong); font-size: 13px; line-height: 1.8; letter-spacing: 0.06em; }
-.search-submit { flex: 0 0 38px; height: 38px; display: grid; place-items: center; border: 0; border-radius: 11px; background: var(--accent-soft); color: var(--accent); transition: background 160ms, color 160ms; }
+.search-submit { flex: 0 0 38px; height: 38px; display: grid; place-items: center; border: 0; border-radius: 11px; background: var(--accent-soft); color: var(--accent); transition: background 160ms, color 160ms, box-shadow 160ms; }
 .search-submit:hover { background: var(--accent); color: white; }
 .search-submit svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .search-wheel-trigger { position: relative; flex: 0 0 38px; height: 38px; }
 .search-wheel-trigger .search-submit { position: relative; z-index: 32; width: 100%; height: 100%; }
 .search-box:has(.search-submit[aria-expanded="true"]) { z-index: 30; padding-right: calc(12px + var(--wheel-room, 0px)); }
 .search-submit[aria-expanded="true"] {
-  border-radius: 50%;
   background: var(--accent);
   color: white;
-  box-shadow: 0 0 0 5px var(--accent-soft), 0 3px 12px rgb(81 57 153 / 18%);
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 3px 12px rgb(81 57 153 / 12%);
 }
 .search-engine-wheel {
   position: absolute;
@@ -1591,7 +1583,7 @@ body[data-background="image"] .header-date { padding: 6px 10px; border-radius: 1
   }
 
   .brand { top: 18px; left: 20px; font-size: 17px; }
-  .brand-mark { width: 34px; height: 34px; font-size: 25px; }
+  .brand-mark { width: 34px; height: 34px; }
   .header-date { display: none; }
   .top-actions { right: 20px; top: 18px; gap: 6px; }
   .top-actions .icon-button { width: 34px; height: 34px; border-radius: 10px; }
