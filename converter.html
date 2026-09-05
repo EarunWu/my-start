@@ -8,6 +8,7 @@
   </head>
   <body>
     <div class="page-shell converter-shell">
+      <a class="brand" href="index.html" aria-label="My Start 首页"><span class="brand-mark" aria-hidden="true">m<span>·</span></span><span>my start<span class="brand-dot">.</span></span></a>
       <div class="top-actions">
         <a class="icon-button" href="index.html" aria-label="返回起始页" title="返回起始页">
           <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -18,13 +19,15 @@
       </div>
 
       <main class="converter-panel" aria-labelledby="converterTitle">
-        <p class="eyebrow">Local Tool</p>
+        <div class="tool-label">MY START / 小工具</div>
+        <p class="eyebrow">LESS FRICTION, MORE FLOW</p>
         <h1 id="converterTitle">Session 转换</h1>
+        <p class="hero-description">粘贴、转换、带走。让繁琐的格式整理简单一点。</p>
 
         <form class="converter-grid" id="converterForm">
           <section class="converter-column" aria-labelledby="sessionInputTitle">
             <header class="converter-column-header">
-              <h2 id="sessionInputTitle">输入</h2>
+              <h2 id="sessionInputTitle"><span class="step-number">01</span> 输入</h2>
               <span>粘贴文本或选择文件</span>
             </header>
 
@@ -33,7 +36,7 @@
               class="converter-textarea"
               id="sessionInput"
               spellcheck="false"
-              placeholder="粘贴 seesion.txt 的完整文本内容..."
+              placeholder="在这里粘贴 Session JSON 文本…"
             ></textarea>
 
             <input class="visually-hidden" id="sessionFileInput" type="file" accept=".txt,.json,application/json,text/plain">
@@ -54,7 +57,7 @@
 
           <section class="converter-column" aria-labelledby="convertedOutputTitle">
             <header class="converter-column-header">
-              <h2 id="convertedOutputTitle">输出</h2>
+              <h2 id="convertedOutputTitle"><span class="step-number">02</span> 输出</h2>
               <span id="converterStatus" aria-live="polite">等待转换</span>
             </header>
 
@@ -64,9 +67,11 @@
               <button class="secondary-button" id="copyConvertedButton" type="button" disabled>复制</button>
               <button class="primary-button" id="downloadConvertedButton" type="button" disabled>下载 JSON</button>
             </div>
+            <p class="converter-file-name" aria-hidden="true"></p>
           </section>
         </form>
       </main>
+      <footer class="page-footer"><span><i aria-hidden="true"></i> 转换在浏览器本地完成</span><a href="index.html">返回我的导航 ↗</a></footer>
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite">

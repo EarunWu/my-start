@@ -566,6 +566,8 @@ document.addEventListener("DOMContentLoaded", init);
 async function init() {
   cacheElements();
   bindEvents();
+  updateHeaderDate();
+  window.setInterval(updateHeaderDate, 60000);
   state.data = await storage.load();
   state.activeGroupId = state.data.groups[0]?.id || "";
   render();
@@ -576,6 +578,14 @@ function focusSearchInput() {
   window.requestAnimationFrame(() => {
     elements.searchInput.focus({ preventScroll: true });
   });
+}
+
+function updateHeaderDate() {
+  const date = document.querySelector("#headerDate");
+  if (!date) return;
+  const now = new Date();
+  date.dateTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  date.textContent = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "long" }).format(now);
 }
 
 function cacheElements() {
@@ -591,6 +601,10 @@ function cacheElements() {
   elements.searchEngineIcon = document.querySelector("#searchEngineIcon");
   elements.searchEngineMenu = document.querySelector("#searchEngineMenu");
   elements.searchInput = document.querySelector("#searchInput");
+  elements.searchWheelTrigger = document.querySelector("#searchWheelTrigger");
+  elements.searchSubmitButton = document.querySelector("#searchSubmitButton");
+  elements.searchEngineWheel = document.querySelector("#searchEngineWheel");
+  elements.searchWheelOptions = document.querySelector("#searchWheelOptions");
   elements.jsonPanel = document.querySelector("#jsonPanel");
   elements.jsonOutput = document.querySelector("#jsonOutput");
   elements.copyJsonButton = document.querySelector("#copyJsonButton");
@@ -633,6 +647,7 @@ function bindEvents() {
   elements.importConfigInput.addEventListener("change", handleImport);
   elements.searchForm.addEventListener("submit", handleSearchSubmit);
   elements.searchEngineButton.addEventListener("click", toggleSearchEngineMenu);
+  bindSearchWheelEvents();
   elements.searchBox.addEventListener("dragenter", handleSearchDragEnter);
   elements.searchBox.addEventListener("dragover", handleSearchDragOver);
   elements.searchBox.addEventListener("dragleave", handleSearchDragLeave);
@@ -667,7 +682,18 @@ function bindEvents() {
   });
 
   document.addEventListener("keydown", (event) => {
+    if (event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey && elements.editModal.hidden &&
+        !event.target.closest("input, textarea, select, [contenteditable='true']")) {
+      event.preventDefault();
+      focusSearchInput();
+      return;
+    }
     if (event.key !== "Escape") {
+      return;
+    }
+    if (!elements.searchEngineWheel.hidden) {
+      event.preventDefault();
+      closeSearchWheel(true);
       return;
     }
     if (!elements.editModal.hidden) {
@@ -875,6 +901,147 @@ function renderSearchEngine() {
   elements.searchEngineIcon.alt = currentEngine.name;
   elements.searchEngineButton.title = `当前搜索引擎：${currentEngine.name}`;
   renderSearchEngineMenu(currentEngine.id);
+  renderSearchWheel(currentEngine.id);
+}
+
+let searchWheelTimer = 0;
+let searchWheelCloseTimer = 0;
+
+function bindSearchWheelEvents() {
+  elements.searchWheelTrigger.addEventListener("pointerenter", (event) => {
+    if (event.pointerType === "touch") return;
+    window.clearTimeout(searchWheelTimer);
+    window.clearTimeout(searchWheelCloseTimer);
+    elements.searchEngineWheel.classList.remove("is-closing");
+    searchWheelTimer = window.setTimeout(openSearchWheel, 140);
+  });
+  elements.searchWheelTrigger.addEventListener("pointerleave", () => {
+    window.clearTimeout(searchWheelTimer);
+    searchWheelTimer = window.setTimeout(() => {
+      if (!elements.searchEngineWheel.contains(document.activeElement)) closeSearchWheel(false, true);
+    }, 300);
+  });
+  elements.searchWheelTrigger.addEventListener("focusout", (event) => {
+    if (!elements.searchWheelTrigger.contains(event.relatedTarget)) closeSearchWheel();
+  });
+  elements.searchSubmitButton.addEventListener("click", (event) => {
+    if (event.pointerType === "touch" && elements.searchEngineWheel.hidden) {
+      event.preventDefault();
+      openSearchWheel();
+    } else {
+      closeSearchWheel();
+    }
+  });
+  elements.searchSubmitButton.addEventListener("keydown", (event) => {
+    if (["ArrowDown", "ArrowRight", "ArrowUp"].includes(event.key)) {
+      event.preventDefault();
+      openSearchWheel();
+      const active = elements.searchWheelOptions.querySelector('[aria-pressed="true"]');
+      (active || elements.searchWheelOptions.querySelector("button"))?.focus();
+    }
+  });
+  elements.searchEngineWheel.addEventListener("keydown", (event) => {
+    const buttons = [...elements.searchWheelOptions.querySelectorAll("button")];
+    const current = buttons.indexOf(document.activeElement);
+    if (current < 0) return;
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+    if (step) {
+      event.preventDefault();
+      buttons[(current + step + buttons.length) % buttons.length].focus();
+    } else if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      buttons[event.key === "Home" ? 0 : buttons.length - 1].focus();
+    }
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (!elements.searchWheelTrigger.contains(event.target)) closeSearchWheel();
+  });
+  window.addEventListener("resize", () => closeSearchWheel());
+  window.addEventListener("blur", () => closeSearchWheel());
+}
+
+function openSearchWheel() {
+  window.clearTimeout(searchWheelTimer);
+  window.clearTimeout(searchWheelCloseTimer);
+  elements.searchEngineWheel.classList.remove("is-closing");
+  if (!state.data || !elements.editModal.hidden || !elements.searchEngineWheel.hidden) return;
+  closeSearchEngineMenu();
+  // On narrow screens, make room inside the search bar so the button stays at the wheel's center.
+  const trigger = elements.searchSubmitButton.getBoundingClientRect();
+  const overflow = Math.max(0, trigger.x + trigger.width / 2 + 164 - document.documentElement.clientWidth);
+  elements.searchBox.style.setProperty("--wheel-room", `${overflow}px`);
+  elements.searchEngineWheel.hidden = false;
+  elements.searchSubmitButton.setAttribute("aria-expanded", "true");
+}
+
+function closeSearchWheel(restoreFocus = false, animate = false) {
+  window.clearTimeout(searchWheelTimer);
+  window.clearTimeout(searchWheelCloseTimer);
+  if (animate && !elements.searchEngineWheel.hidden) {
+    elements.searchEngineWheel.classList.add("is-closing");
+    searchWheelCloseTimer = window.setTimeout(() => closeSearchWheel(restoreFocus), 120);
+    return;
+  }
+  elements.searchEngineWheel.classList.remove("is-closing");
+  elements.searchEngineWheel.hidden = true;
+  elements.searchSubmitButton.setAttribute("aria-expanded", "false");
+  elements.searchBox.style.removeProperty("--wheel-room");
+  if (restoreFocus) elements.searchSubmitButton.focus();
+}
+
+function getSearchWheelSectorPath(index, count) {
+  const start = -Math.PI / 2 + (index / count) * Math.PI + 0.014;
+  const end = -Math.PI / 2 + ((index + 1) / count) * Math.PI - 0.014;
+  const point = (radius, angle) => `${(Math.cos(angle) * radius).toFixed(3)} ${(152 + Math.sin(angle) * radius).toFixed(3)}`;
+  return `M ${point(150, start)} A 150 150 0 0 1 ${point(150, end)} L ${point(49, end)} A 49 49 0 0 0 ${point(49, start)} Z`;
+}
+
+function renderSearchWheel(activeEngineId) {
+  elements.searchWheelOptions.replaceChildren();
+  SEARCH_ENGINES.forEach((engine, index) => {
+    // Five sectors across the right half-circle, centered on the search button.
+    const angle = -Math.PI / 2 + ((index + 0.5) / SEARCH_ENGINES.length) * Math.PI;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "search-wheel-option";
+    button.dataset.engineId = engine.id;
+    button.style.setProperty("--wheel-x", `${Math.cos(angle) * 103}px`);
+    button.style.setProperty("--wheel-y", `${Math.sin(angle) * 103}px`);
+    button.style.setProperty("--wheel-delay", `${index * 80}ms`);
+    const sectorPath = getSearchWheelSectorPath(index, SEARCH_ENGINES.length);
+    button.style.clipPath = `path("${sectorPath}")`;
+    button.setAttribute("aria-label", `使用 ${engine.name} 搜索`);
+    button.setAttribute("aria-pressed", String(engine.id === activeEngineId));
+    const sector = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    sector.setAttribute("viewBox", "0 0 152 304");
+    sector.setAttribute("aria-hidden", "true");
+    sector.classList.add("search-wheel-sector");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", sectorPath);
+    sector.append(path);
+    const content = document.createElement("span");
+    content.className = "search-wheel-option-content";
+    const mark = document.createElement("span");
+    mark.className = "search-wheel-icon";
+    mark.textContent = engine.mark;
+    const image = document.createElement("img");
+    image.alt = "";
+    image.hidden = true;
+    image.addEventListener("load", () => {
+      mark.replaceChildren(image);
+      image.hidden = false;
+    });
+    image.addEventListener("error", () => { mark.textContent = engine.mark; });
+    mark.append(image);
+    image.src = engine.icon;
+    const label = document.createElement("span");
+    label.className = "search-wheel-label";
+    label.textContent = engine.name;
+    content.append(mark, label);
+    button.append(sector, content);
+    button.addEventListener("click", () => selectSearchEngine(engine.id, { search: true }));
+    elements.searchWheelOptions.append(button);
+  });
 }
 
 function renderSearchEngineMenu(activeEngineId) {
@@ -962,6 +1129,7 @@ async function copyFormattedJson() {
 
 function toggleSearchEngineMenu(event) {
   event.stopPropagation();
+  closeSearchWheel();
   const willOpen = elements.searchEngineMenu.hidden;
   elements.searchEngineMenu.hidden = !willOpen;
   elements.searchEngineButton.setAttribute("aria-expanded", String(willOpen));
@@ -972,7 +1140,7 @@ function closeSearchEngineMenu() {
   elements.searchEngineButton.setAttribute("aria-expanded", "false");
 }
 
-async function selectSearchEngine(engineId) {
+async function selectSearchEngine(engineId, { search = false } = {}) {
   const engine = SEARCH_ENGINES.find((item) => item.id === engineId);
   if (!engine) {
     return;
@@ -982,8 +1150,20 @@ async function selectSearchEngine(engineId) {
   nextData.settings.searchEngineId = engine.id;
   nextData.settings.searchEngineName = engine.name;
   nextData.settings.searchUrlTemplate = engine.searchUrlTemplate;
+  const query = elements.searchInput.value.trim();
   closeSearchEngineMenu();
-  await saveData(nextData);
+  closeSearchWheel();
+  try {
+    await saveData(nextData);
+  } catch (error) {
+    console.error(error);
+    showToast("搜索引擎保存失败，请重试。");
+    return;
+  }
+  if (search && query) {
+    window.location.href = buildSearchUrl(engine, query);
+    return;
+  }
   elements.searchInput.focus();
   showToast(`已切换到 ${engine.name}。`);
 }
@@ -1079,6 +1259,8 @@ function canSortSites() {
 }
 
 function renderSites() {
+  const count = document.querySelector("#siteCount");
+  if (count) count.textContent = `${getVisibleSites().length}`;
   if (state.formattedJson) {
     elements.siteGrid.hidden = true;
     elements.emptyState.hidden = true;
@@ -1571,7 +1753,8 @@ function populateSiteIcon(container, site) {
     if (!isCurrentRender() || !source) {
       return;
     }
-    fallback.remove();
+    if (!container.contains(fallback)) container.append(fallback);
+    image.hidden = true;
     if (!container.contains(image)) {
       container.append(image);
     }
@@ -1585,9 +1768,18 @@ function populateSiteIcon(container, site) {
 
   const image = document.createElement("img");
   image.alt = "";
-  image.loading = "lazy";
+  // Hidden lazy images may never load, so fetch these small navigation icons immediately.
+  image.loading = "eager";
+  image.hidden = true;
+  image.addEventListener("load", () => {
+    if (!isCurrentRender()) return;
+    fallback.remove();
+    image.hidden = false;
+  });
   image.addEventListener("error", showFallback);
-  setImageSource(site.icon);
+  // The card is still detached here; connectivity guards are only for async cache updates.
+  container.append(fallback, image);
+  image.src = site.icon;
 
   siteIconCacheStorage
     .load(site.icon)
@@ -1830,6 +2022,7 @@ function submitImageFileSearch(file, engine) {
 }
 
 function openModal() {
+  closeSearchWheel();
   elements.modalBackdrop.hidden = false;
   elements.editModal.hidden = false;
   elements.editModal.setAttribute("aria-hidden", "false");

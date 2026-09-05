@@ -8,7 +8,12 @@
   </head>
   <body>
     <div class="page-shell">
+      <a class="brand" href="index.html" aria-label="My Start 首页">
+        <span class="brand-mark" aria-hidden="true">m<span>·</span></span>
+        <span>my start<span class="brand-dot">.</span></span>
+      </a>
       <div class="top-actions">
+        <time class="header-date" id="headerDate"></time>
         <a class="icon-button converter-button" href="converter.html" aria-label="打开转换工具" title="转换工具">
           <svg aria-hidden="true" viewBox="0 0 24 24">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path>
@@ -59,8 +64,10 @@
       </div>
 
       <main class="start-panel" aria-labelledby="pageTitle">
-        <p class="eyebrow">Personal Start</p>
-        <h1 id="pageTitle">My Start</h1>
+        <div class="welcome-mark" aria-hidden="true">✳</div>
+        <p class="eyebrow">YOUR DAILY SPACE</p>
+        <h1 id="pageTitle">小小起点<span>，</span>无限可能<span>。</span></h1>
+        <p class="hero-description">收藏所爱，专注当下。新的一程，从这里开始。</p>
 
         <form class="search-form" id="searchForm" role="search">
           <label class="visually-hidden" for="searchInput">搜索网站或输入关键词</label>
@@ -69,10 +76,21 @@
               <img id="searchEngineIcon" src="" alt="">
             </button>
             <div class="search-engine-menu" id="searchEngineMenu" hidden></div>
-            <input id="searchInput" type="search" autocomplete="off" placeholder="搜索网站、关键词，或粘贴 JSON...">
+            <input id="searchInput" type="search" autocomplete="off" placeholder="搜索网站、关键词，或粘贴 JSON…">
+            <div class="search-wheel-trigger" id="searchWheelTrigger">
+              <button class="search-submit" id="searchSubmitButton" type="submit" aria-label="搜索" aria-expanded="false" aria-controls="searchEngineWheel" aria-describedby="searchWheelHint">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"></path></svg>
+              </button>
+              <span class="visually-hidden" id="searchWheelHint">悬停或按向下方向键选择搜索引擎，触屏点击展开</span>
+              <div class="search-engine-wheel" id="searchEngineWheel" role="group" aria-label="选择引擎并搜索" hidden>
+                <div id="searchWheelOptions"></div>
+              </div>
+            </div>
           </div>
         </form>
+        <p class="search-hint">随时探索 <span>·</span> 拖入图片识图 <span>·</span> 粘贴 JSON 即刻格式化</p>
 
+        <div class="bookmarks-heading"><h2>我的导航 <span id="siteCount"></span></h2><span>把常用的，放在手边</span></div>
         <nav class="group-tabs" id="groupTabs" aria-label="导航分组"></nav>
 
         <section class="site-section" id="siteSection" aria-live="polite">
@@ -87,6 +105,7 @@
           <p class="empty-state" id="emptyState" hidden></p>
         </section>
       </main>
+      <footer class="page-footer"><span><i aria-hidden="true"></i> 你的空间，由你定义</span><span class="keyboard-hint"><kbd>/</kbd> 快速搜索 <span>·</span> <kbd>Esc</kbd> 退出编辑</span></footer>
     </div>
 
     <div class="modal-backdrop" id="modalBackdrop" hidden></div>

@@ -1,6 +1,8 @@
 (function attachSessionConverter(root) {
   "use strict";
 
+  const EMAIL_PATTERN = /[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+/i;
+
   function parseSessionJson(text) {
     const trimmed = String(text || "").trim();
 
@@ -29,6 +31,41 @@
     return value;
   }
 
+  function findEmailInString(value) {
+    const match = value.match(EMAIL_PATTERN);
+    return match?.[0] || "";
+  }
+
+  function findEmail(value) {
+    if (typeof value === "string") {
+      return findEmailInString(value);
+    }
+
+    if (!value || typeof value !== "object") {
+      return "";
+    }
+
+    for (const item of Object.values(value)) {
+      const email = findEmail(item);
+      if (email) {
+        return email;
+      }
+    }
+
+    return "";
+  }
+
+  function sanitizeDownloadNamePart(value) {
+    const sanitized = String(value || "")
+      .trim()
+      .replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
+      .replace(/\s+/g, "_")
+      .replace(/[. ]+$/g, "")
+      .slice(0, 120);
+
+    return sanitized || "kk";
+  }
+
   function convertSessionText(text) {
     const session = parseSessionJson(text);
 
@@ -43,9 +80,17 @@
     return JSON.stringify(convertSessionText(text), null, 2);
   }
 
+  function getCodexTokenDownloadName(text) {
+    const session = parseSessionJson(text);
+    const email = findEmail(session);
+    const baseName = email ? email.split("@")[0] : readRequiredString(session.account?.id, "account.id");
+    return `${sanitizeDownloadNamePart(baseName)}.json`;
+  }
+
   const api = {
     convertSessionText,
     formatCodexTokenFile,
+    getCodexTokenDownloadName,
   };
 
   root.SessionConverter = api;

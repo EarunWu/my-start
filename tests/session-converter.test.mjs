@@ -3,7 +3,11 @@ import { createRequire } from "node:module";
 import test from "node:test";
 
 const require = createRequire(import.meta.url);
-const { convertSessionText, formatCodexTokenFile } = require("../session-converter.js");
+const {
+  convertSessionText,
+  formatCodexTokenFile,
+  getCodexTokenDownloadName,
+} = require("../session-converter.js");
 
 test("converts a full session JSON string into codex token JSON data", () => {
   const sessionText = JSON.stringify({
@@ -56,4 +60,29 @@ test("reports a helpful error when required session fields are missing", () => {
     () => convertSessionText(JSON.stringify({ accessToken: "fake-token" })),
     /缺少 account\.id/,
   );
+});
+
+test("uses the email username as the converted download file name", () => {
+  const sessionText = JSON.stringify({
+    accessToken: "fake-token",
+    account: {
+      id: "fake-account-id",
+    },
+    user: {
+      email: "person.name+codex@example.com",
+    },
+  });
+
+  assert.equal(getCodexTokenDownloadName(sessionText), "person.name+codex.json");
+});
+
+test("falls back to account id when the session input has no email", () => {
+  const sessionText = JSON.stringify({
+    accessToken: "fake-token",
+    account: {
+      id: "fake-account-id",
+    },
+  });
+
+  assert.equal(getCodexTokenDownloadName(sessionText), "fake-account-id.json");
 });

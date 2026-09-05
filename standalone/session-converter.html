@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Session 转换</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7f4;
+        --surface: #ffffff;
+        --surface-soft: #f9faf8;
+        --text: #202631;
+        --muted: #68717d;
+        --line: #dfe4de;
+        --line-strong: #c8d1ca;
+        --accent: #1f6f68;
+        --accent-soft: #dcefeb;
+        --danger: #b24036;
+        --shadow: 0 18px 50px rgba(28, 36, 48, 0.1);
+        --radius: 8px;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      button,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.48;
+      }
+
+      svg {
+        display: block;
+      }
+
+      .page {
+        width: min(1120px, 100%);
+        min-height: 100vh;
+        margin: 0 auto;
+        padding: 56px 22px 36px;
+      }
+
+      .hero {
+        max-width: 760px;
+        margin-bottom: 22px;
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--accent);
+        font-size: 0.76rem;
+        font-weight: 780;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: 2.35rem;
+        line-height: 1.06;
+      }
+
+      .subtitle {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .notice {
+        margin: 20px 0 0;
+        padding: 12px 14px;
+        border: 1px solid rgba(31, 111, 104, 0.2);
+        border-radius: var(--radius);
+        background: var(--accent-soft);
+        color: #24524e;
+        line-height: 1.55;
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .panel {
+        min-width: 0;
+        display: grid;
+        grid-template-rows: auto minmax(380px, 1fr) auto auto;
+        overflow: hidden;
+        border: 1px solid rgba(104, 113, 125, 0.18);
+        border-radius: var(--radius);
+        background: rgba(255, 255, 255, 0.94);
+        box-shadow: var(--shadow);
+      }
+
+      .panel-header {
+        min-height: 58px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .panel-title {
+        margin: 0;
+        font-size: 1rem;
+      }
+
+      .panel-status {
+        color: var(--muted);
+        font-size: 0.84rem;
+        font-weight: 680;
+        text-align: right;
+      }
+
+      .input-area,
+      .output-area {
+        width: 100%;
+        min-width: 0;
+        min-height: 380px;
+        margin: 0;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--text);
+        padding: 15px 16px;
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        font-size: 0.83rem;
+        line-height: 1.58;
+        tab-size: 2;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+
+      .input-area {
+        resize: vertical;
+      }
+
+      .input-area::placeholder {
+        color: #9198a2;
+      }
+
+      .output-area {
+        overflow: auto;
+        user-select: text;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 0 16px 16px;
+      }
+
+      .file-row {
+        min-height: 20px;
+        margin: -8px 16px 14px;
+        color: var(--muted);
+        font-size: 0.78rem;
+        overflow-wrap: anywhere;
+      }
+
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+        clip-path: inset(50%);
+      }
+
+      .button {
+        min-height: 40px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border: 1px solid transparent;
+        border-radius: var(--radius);
+        padding: 0 13px;
+        background: var(--surface-soft);
+        color: var(--text);
+        font-size: 0.9rem;
+        font-weight: 740;
+        text-decoration: none;
+        transition:
+          transform 160ms ease,
+          background 160ms ease,
+          border-color 160ms ease;
+      }
+
+      .button:hover:not(:disabled) {
+        transform: translateY(-1px);
+      }
+
+      .button-primary {
+        border-color: var(--text);
+        background: var(--text);
+        color: #ffffff;
+      }
+
+      .button-secondary {
+        border-color: var(--line-strong);
+      }
+
+      .button svg {
+        width: 16px;
+        height: 16px;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        fill: none;
+      }
+
+      .toast {
+        position: fixed;
+        left: 50%;
+        bottom: 24px;
+        z-index: 10;
+        max-width: min(440px, calc(100vw - 32px));
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        padding: 10px 15px;
+        border-radius: var(--radius);
+        background: var(--text);
+        color: #ffffff;
+        box-shadow: var(--shadow);
+        opacity: 0;
+        pointer-events: none;
+        transform: translate(-50%, 12px);
+        transition:
+          opacity 160ms ease,
+          transform 160ms ease;
+      }
+
+      .toast.is-visible {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+
+      @media (max-width: 780px) {
+        .page {
+          padding: 34px 16px 28px;
+        }
+
+        h1 {
+          font-size: 2rem;
+        }
+
+        .workspace {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .panel {
+          grid-template-rows: auto minmax(280px, 1fr) auto auto;
+        }
+
+        .panel-header {
+          min-height: 0;
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 5px;
+          padding: 13px 14px;
+        }
+
+        .panel-status {
+          text-align: left;
+        }
+
+        .input-area,
+        .output-area {
+          min-height: 280px;
+        }
+
+        .actions {
+          padding: 0 14px 14px;
+        }
+
+        .file-row {
+          margin-right: 14px;
+          margin-left: 14px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow">Local Converter</p>
+        <h1>Session 转换</h1>
+        <p class="subtitle">把完整 session JSON 转换为反代可用的 JSON 格式。</p>
+        <p class="notice">仅在当前浏览器本地处理，不上传数据。转换完成后请妥善保管生成的 JSON 文件。</p>
+      </header>
+
+      <form class="workspace" id="converterForm">
+        <section class="panel" aria-labelledby="inputTitle">
+          <header class="panel-header">
+            <h2 class="panel-title" id="inputTitle">输入</h2>
+            <span class="panel-status">粘贴 session 文本或选择文件</span>
+          </header>
+
+          <label class="visually-hidden" for="sessionInput">Session JSON 文本</label>
+          <textarea
+            class="input-area"
+            id="sessionInput"
+            spellcheck="false"
+            placeholder="粘贴包含 accessToken 和 account.id 的完整 session JSON..."
+          ></textarea>
+
+          <input class="visually-hidden" id="sessionFileInput" type="file" accept=".txt,.json,application/json,text/plain">
+          <div class="actions">
+            <label class="button button-secondary" for="sessionFileInput">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M12 3v12"></path>
+                <path d="m7 8 5-5 5 5"></path>
+                <path d="M5 21h14"></path>
+              </svg>
+              选择文件
+            </label>
+            <button class="button button-secondary" id="copySessionUrlButton" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              复制session地址
+            </button>
+            <button class="button button-primary" id="convertButton" type="submit">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="m10 13-2 2 2 2"></path>
+                <path d="m14 17 2-2-2-2"></path>
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path>
+                <path d="M14 2v6h6"></path>
+              </svg>
+              转换
+            </button>
+            <button class="button button-secondary" id="clearButton" type="button">清空</button>
+          </div>
+          <p class="file-row" id="fileName" aria-live="polite"></p>
+        </section>
+
+        <section class="panel" aria-labelledby="outputTitle">
+          <header class="panel-header">
+            <h2 class="panel-title" id="outputTitle">输出</h2>
+            <span class="panel-status" id="statusText" aria-live="polite">等待转换</span>
+          </header>
+
+          <pre class="output-area"><code id="outputJson"></code></pre>
+
+          <div class="actions">
+            <button class="button button-secondary" id="copyButton" type="button" disabled>
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              复制
+            </button>
+            <button class="button button-primary" id="downloadButton" type="button" disabled>
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M12 3v12"></path>
+                <path d="m7 10 5 5 5-5"></path>
+                <path d="M5 21h14"></path>
+              </svg>
+              下载 JSON
+            </button>
+          </div>
+        </section>
+      </form>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      const elements = {};
+      const state = {
+        output: "",
+        downloadName: "kk.json",
+        toastTimer: 0,
+      };
+      const SESSION_URL = "https://chatgpt.com/api/auth/session";
+      const EMAIL_PATTERN = /[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+/i;
+
+      document.addEventListener("DOMContentLoaded", init);
+
+      function init() {
+        cacheElements();
+        bindEvents();
+        setOutput("");
+      }
+
+      function cacheElements() {
+        elements.form = document.querySelector("#converterForm");
+        elements.sessionInput = document.querySelector("#sessionInput");
+        elements.sessionFileInput = document.querySelector("#sessionFileInput");
+        elements.fileName = document.querySelector("#fileName");
+        elements.outputJson = document.querySelector("#outputJson");
+        elements.statusText = document.querySelector("#statusText");
+        elements.copyButton = document.querySelector("#copyButton");
+        elements.downloadButton = document.querySelector("#downloadButton");
+        elements.clearButton = document.querySelector("#clearButton");
+        elements.copySessionUrlButton = document.querySelector("#copySessionUrlButton");
+        elements.toast = document.querySelector("#toast");
+      }
+
+      function bindEvents() {
+        elements.form.addEventListener("submit", handleSubmit);
+        elements.sessionInput.addEventListener("input", () => {
+          elements.fileName.textContent = "";
+        });
+        elements.sessionFileInput.addEventListener("change", handleFileChange);
+        elements.copyButton.addEventListener("click", copyOutput);
+        elements.downloadButton.addEventListener("click", downloadOutput);
+        elements.clearButton.addEventListener("click", clearForm);
+        elements.copySessionUrlButton.addEventListener("click", copySessionUrl);
+      }
+
+      function handleSubmit(event) {
+        event.preventDefault();
+        convertInput();
+      }
+
+      async function handleFileChange(event) {
+        const [file] = event.target.files;
+        if (!file) {
+          return;
+        }
+
+        try {
+          elements.sessionInput.value = await file.text();
+          elements.fileName.textContent = file.name;
+          convertInput();
+        } catch (error) {
+          console.error(error);
+          showToast("读取文件失败，请重试。");
+        } finally {
+          event.target.value = "";
+        }
+      }
+
+      function parseSessionJson(text) {
+        const trimmed = String(text || "").trim();
+        if (!trimmed) {
+          throw new Error("请输入 session JSON 文本。");
+        }
+
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+            throw new Error("session JSON 必须是对象。");
+          }
+          return parsed;
+        } catch (error) {
+          if (error.message === "session JSON 必须是对象。") {
+            throw error;
+          }
+          throw new Error("JSON 解析失败，请检查输入内容。");
+        }
+      }
+
+      function readRequiredString(value, path) {
+        if (typeof value !== "string" || !value.trim()) {
+          throw new Error(`缺少 ${path}。`);
+        }
+        return value;
+      }
+
+      function findEmailInString(value) {
+        const match = value.match(EMAIL_PATTERN);
+        return match?.[0] || "";
+      }
+
+      function findEmail(value) {
+        if (typeof value === "string") {
+          return findEmailInString(value);
+        }
+
+        if (!value || typeof value !== "object") {
+          return "";
+        }
+
+        for (const item of Object.values(value)) {
+          const email = findEmail(item);
+          if (email) {
+            return email;
+          }
+        }
+
+        return "";
+      }
+
+      function sanitizeDownloadNamePart(value) {
+        const sanitized = String(value || "")
+          .trim()
+          .replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
+          .replace(/\s+/g, "_")
+          .replace(/[. ]+$/g, "")
+          .slice(0, 120);
+
+        return sanitized || "kk";
+      }
+
+      function convertSessionText(text) {
+        const session = parseSessionJson(text);
+        return {
+          access_token: readRequiredString(session.accessToken, "accessToken"),
+          account_id: readRequiredString(session.account?.id, "account.id"),
+          type: "codex",
+        };
+      }
+
+      function getDownloadName(text) {
+        const session = parseSessionJson(text);
+        const email = findEmail(session);
+        const baseName = email ? email.split("@")[0] : readRequiredString(session.account?.id, "account.id");
+        return `${sanitizeDownloadNamePart(baseName)}.json`;
+      }
+
+      function convertInput() {
+        try {
+          const input = elements.sessionInput.value;
+          const converted = convertSessionText(input);
+          state.downloadName = getDownloadName(input);
+          setOutput(JSON.stringify(converted, null, 2));
+          elements.statusText.textContent = "转换完成";
+          showToast("已转换为反代可用的 JSON 格式。");
+        } catch (error) {
+          setOutput("");
+          elements.statusText.textContent = error.message;
+          showToast(error.message);
+        }
+      }
+
+      function setOutput(output) {
+        state.output = output;
+        elements.outputJson.textContent = output;
+        elements.copyButton.disabled = !output;
+        elements.downloadButton.disabled = !output;
+        if (!output) {
+          state.downloadName = "kk.json";
+          elements.statusText.textContent = "等待转换";
+        }
+      }
+
+      function clearForm() {
+        elements.sessionInput.value = "";
+        elements.fileName.textContent = "";
+        setOutput("");
+        elements.sessionInput.focus();
+      }
+
+      async function copyOutput() {
+        if (!state.output) {
+          return;
+        }
+
+        try {
+          await navigator.clipboard.writeText(state.output);
+          showToast("已复制 JSON。");
+        } catch (error) {
+          console.error(error);
+          showToast("复制失败，请手动选择输出内容。");
+        }
+      }
+
+      async function copySessionUrl() {
+        try {
+          await navigator.clipboard.writeText(SESSION_URL);
+          showToast("已复制 session 地址。");
+        } catch (error) {
+          console.error(error);
+          showToast("复制失败，请手动复制：https://chatgpt.com/api/auth/session");
+        }
+      }
+
+      function downloadOutput() {
+        if (!state.output) {
+          return;
+        }
+
+        const blob = new Blob([state.output], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = state.downloadName;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        showToast(`已下载 ${state.downloadName}。`);
+      }
+
+      function showToast(message) {
+        window.clearTimeout(state.toastTimer);
+        elements.toast.textContent = message;
+        elements.toast.classList.add("is-visible");
+        state.toastTimer = window.setTimeout(() => {
+          elements.toast.classList.remove("is-visible");
+        }, 2400);
+      }
+    </script>
+  </body>
+</html>

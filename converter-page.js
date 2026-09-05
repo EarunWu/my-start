@@ -2,6 +2,7 @@ const converterElements = {};
 
 const converterState = {
   output: "",
+  downloadName: "kk.json",
   toastTimer: 0,
 };
 
@@ -63,10 +64,12 @@ async function handleSessionFileChange(event) {
 
 function convertCurrentInput() {
   try {
-    const output = window.SessionConverter.formatCodexTokenFile(converterElements.sessionInput.value);
+    const input = converterElements.sessionInput.value;
+    const output = window.SessionConverter.formatCodexTokenFile(input);
+    converterState.downloadName = window.SessionConverter.getCodexTokenDownloadName(input);
     updateConverterOutput(output);
     converterElements.status.textContent = "转换完成";
-    showConverterToast("已转换为 Codex JSON。");
+    showConverterToast("已转换为反代可用的 JSON 格式。");
   } catch (error) {
     updateConverterOutput("");
     converterElements.status.textContent = error.message;
@@ -81,6 +84,7 @@ function updateConverterOutput(output) {
   converterElements.downloadButton.disabled = !output;
 
   if (!output) {
+    converterState.downloadName = "kk.json";
     converterElements.status.textContent = "等待转换";
   }
 }
@@ -115,7 +119,7 @@ function downloadConvertedOutput() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "kk.json";
+  link.download = converterState.downloadName;
   document.body.append(link);
   link.click();
   link.remove();
