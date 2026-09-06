@@ -36,7 +36,7 @@ python serve.py --open
 
 ## 部署到 Cloudflare
 
-当前站点：[My Start](https://web-start.lite-drop.workers.dev/)。
+当前站点：[My Start](https://mystart.pununu.com/)。备用地址：[workers.dev](https://web-start.lite-drop.workers.dev/)。
 
 项目通过 Workers Static Assets 发布，不需要构建页面。Node.js 和 Wrangler 仅用于部署，本地使用仍可运行 `start.cmd`。
 
@@ -66,7 +66,9 @@ npm run deploy
 - 分组、网站、搜索引擎等配置存放在 `localStorage`。
 - 自定义背景图片存放在 `IndexedDB`，避免大图片撑爆 `localStorage`。
 - 导出配置时会把背景图片重新打包进 JSON。
-- 跨域网站图标使用图片元素直接加载，并由浏览器缓存；不再通过 `fetch` 读取不提供 CORS 权限的图标服务。图标不存在时回退到网站首字。
+- 网站图标依次尝试自定义链接、上次成功地址、网站 `/favicon.ico`、`/favicon.svg` 和 Google 图标服务，全部失败后显示首字母。图片通过 `<img>` 加载，不跨域 `fetch` 图片或网页。
+- 成功图标地址在本地记忆 30 天（最多 200 个站点），图片内容由浏览器缓存；失败地址在当前页面冷却 5 分钟。同站点并发获取合并，每个候选地址最多等待 2.5 秒。“重新获取”可跳过失败冷却。
+- 编辑网页时，图标链接留空表示自动获取，填写链接表示自定义。窗口会验证图片并显示预览；自动回退不覆盖自定义链接。旧 Google 服务地址默认迁移为自动模式，其他旧图标保留为自定义；图标来源缓存不随配置导出。
 
 当前版本没有账号、登录和云同步。
 

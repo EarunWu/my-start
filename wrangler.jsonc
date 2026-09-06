@@ -4,6 +4,13 @@
   "account_id": "4fe0640728dac2d811b796a24a009398",
   "compatibility_date": "2026-09-06",
   "workers_dev": true,
+  "routes": [
+    {
+      "pattern": "mystart.pununu.com",
+      "zone_id": "6a00deacacfc1295317bb78de837f10d",
+      "custom_domain": true
+    }
+  ],
   "assets": {
     "directory": "."
   },

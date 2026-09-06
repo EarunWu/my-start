@@ -6,9 +6,29 @@ const NAVIGATION_PRESET_ID = "personal-a-v1";
 const ASSET_DB_NAME = "my-start-assets-v1";
 const ASSET_STORE_NAME = "assets";
 const BACKGROUND_ASSET_KEY = "background-image";
-const ICON_CACHE_PREFIX = "site-icon:";
-const ICON_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const FAVICON_SERVICE_TEMPLATE = "https://www.google.com/s2/favicons?domain={domain}&sz=64";
+let siteIconResolver;
+let iconPreviewRevision = 0;
+let iconPreviewTimer;
+
+function getIconMode(site) {
+  if (site.iconMode === "custom" || site.iconMode === "auto") return site.iconMode;
+  if (!site.icon) return "auto";
+  try {
+    const url = new URL(site.icon);
+    if (url.hostname === "www.google.com" && url.pathname === "/s2/favicons") return "auto";
+  } catch { /* Preserve existing custom values. */ }
+  return "custom";
+}
+
+function getSiteIconResolver() {
+  if (!siteIconResolver) {
+    let storage;
+    try { storage = window.localStorage; } catch { /* Optional cache. */ }
+    siteIconResolver = new SiteIcons.Resolver({ storage });
+  }
+  return siteIconResolver;
+}
 const BACKGROUND_TYPES = new Set(["white", "black", "image"]);
 const DEFAULT_BACKGROUND_SETTINGS = {
   type: "white",
@@ -242,6 +262,7 @@ function normalizeData(input) {
           name: normalizeText(site.name),
           url: normalizeUrl(site.url),
           icon: normalizeText(site.icon),
+          iconMode: getIconMode(site),
         }))
         .filter((site) => site.name && site.url)
     : fallback.sites;
@@ -350,92 +371,6 @@ const backgroundAssetStorage = {
 
   async remove(key = BACKGROUND_ASSET_KEY) {
     await withAssetStore("readwrite", (store) => store.delete(key));
-  },
-};
-
-function createIconCacheKey(iconUrl) {
-  return `${ICON_CACHE_PREFIX}${encodeURIComponent(iconUrl)}`;
-}
-
-function normalizeIconCacheEntry(entry, iconUrl) {
-  if (!entry || typeof entry !== "object") {
-    return null;
-  }
-
-  if (entry.sourceUrl !== iconUrl || !entry.dataUrl || !entry.fetchedAt) {
-    return null;
-  }
-
-  return entry;
-}
-
-function readBlobAsDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener("load", () => resolve(String(reader.result || "")));
-    reader.addEventListener("error", () => reject(reader.error));
-    reader.readAsDataURL(blob);
-  });
-}
-
-async function fetchIconAsDataUrl(iconUrl) {
-  const response = await fetch(iconUrl);
-  if (!response.ok) {
-    throw new Error(`Icon request failed: ${response.status}`);
-  }
-
-  const contentType = response.headers.get("content-type") || "";
-  if (contentType && !contentType.toLowerCase().startsWith("image/")) {
-    throw new Error("Icon response is not an image.");
-  }
-
-  const blob = await response.blob();
-  if (blob.type && !blob.type.toLowerCase().startsWith("image/")) {
-    throw new Error("Icon blob is not an image.");
-  }
-
-  return readBlobAsDataUrl(blob);
-}
-
-function canCacheIcon(iconUrl, pageUrl = globalThis.location?.href) {
-  try {
-    const page = new URL(pageUrl), icon = new URL(iconUrl, page);
-    return /^https?:$/.test(page.protocol) && icon.origin === page.origin;
-  } catch {
-    return false;
-  }
-}
-
-const siteIconCacheStorage = {
-  async load(iconUrl) {
-    if (!iconUrl) {
-      return null;
-    }
-
-    const entry = await withAssetStore("readonly", (store) => store.get(createIconCacheKey(iconUrl)));
-    return normalizeIconCacheEntry(entry, iconUrl);
-  },
-
-  async save(iconUrl, dataUrl) {
-    const entry = {
-      sourceUrl: iconUrl,
-      dataUrl,
-      fetchedAt: Date.now(),
-    };
-    await withAssetStore("readwrite", (store) => store.put(entry, createIconCacheKey(iconUrl)));
-    return entry;
-  },
-
-  isFresh(entry) {
-    return Boolean(entry && Date.now() - Number(entry.fetchedAt) < ICON_CACHE_TTL_MS);
-  },
-
-  async refresh(iconUrl) {
-    // Cross-origin icons render in <img>; reading their bytes requires CORS permission.
-    // Let the browser HTTP cache handle those images and keep existing local entries usable.
-    if (!canCacheIcon(iconUrl)) return null;
-    const dataUrl = await fetchIconAsDataUrl(iconUrl);
-    return this.save(iconUrl, dataUrl);
   },
 };
 
@@ -651,6 +586,8 @@ function cacheElements() {
   elements.siteUrlInput = document.querySelector("#siteUrlInput");
   elements.siteIconInput = document.querySelector("#siteIconInput");
   elements.fetchSiteIconButton = document.querySelector("#fetchSiteIconButton");
+  elements.siteIconPreview = document.querySelector("#siteIconPreview");
+  elements.siteIconStatus = document.querySelector("#siteIconStatus");
   elements.backgroundForm = document.querySelector("#backgroundForm");
   elements.backgroundChoiceButtons = Array.from(document.querySelectorAll("[data-background-choice]"));
   elements.backgroundPreview = document.querySelector("#backgroundPreview");
@@ -690,6 +627,8 @@ function bindEvents() {
   elements.deleteGroupButton.addEventListener("click", handleDeleteGroup);
   elements.siteForm.addEventListener("submit", handleSiteSubmit);
   elements.fetchSiteIconButton.addEventListener("click", handleFetchSiteIcon);
+  elements.siteUrlInput.addEventListener("input", scheduleIconPreview);
+  elements.siteIconInput.addEventListener("input", scheduleIconPreview);
   elements.backgroundForm.addEventListener("submit", handleBackgroundSubmit);
   elements.backgroundImageInput.addEventListener("change", handleBackgroundImageChange);
   elements.uploadBackgroundImageButton.addEventListener("click", () =>
@@ -1543,7 +1482,7 @@ async function addDroppedBookmark(url, dataTransfer) {
 
   const nextData = cloneData(state.data);
   const title = getDroppedBookmarkTitle(url, dataTransfer);
-  const icon = getFaviconUrl(url);
+  const icon = "";
 
   nextData.sites.push({
     id: createId("site"),
@@ -1551,6 +1490,7 @@ async function addDroppedBookmark(url, dataTransfer) {
     name: title,
     url,
     icon,
+    iconMode: "auto",
   });
 
   await saveData(nextData);
@@ -1774,82 +1714,24 @@ function finishSiteCardDrag() {
 function populateSiteIcon(container, site) {
   const fallback = document.createElement("span");
   fallback.textContent = site.name.slice(0, 1).toUpperCase();
-  const renderToken = createId("icon-render");
-  container.dataset.iconRenderToken = renderToken;
-
-  function isCurrentRender() {
-    return container.isConnected && container.dataset.iconRenderToken === renderToken;
-  }
-
-  function showFallback() {
-    if (!isCurrentRender()) {
-      return;
-    }
-    image?.remove();
-    if (!container.contains(fallback)) {
-      container.append(fallback);
-    }
-  }
-
-  function setImageSource(source) {
-    if (!isCurrentRender() || !source) {
-      return;
-    }
-    if (!container.contains(fallback)) container.append(fallback);
+  container.append(fallback);
+  const token = createId("icon-render");
+  container.dataset.iconRenderToken = token;
+  getSiteIconResolver().resolve({ ...site, iconMode: getIconMode(site) }).then(result => {
+    if (!result || !container.isConnected || container.dataset.iconRenderToken !== token) return;
+    const image = document.createElement("img");
+    image.alt = "";
+    image.referrerPolicy = "no-referrer";
     image.hidden = true;
-    if (!container.contains(image)) {
-      container.append(image);
-    }
-    image.src = source;
-  }
-
-  if (!site.icon) {
-    container.append(fallback);
-    return;
-  }
-
-  const image = document.createElement("img");
-  image.alt = "";
-  // Hidden lazy images may never load, so fetch these small navigation icons immediately.
-  image.loading = "eager";
-  image.hidden = true;
-  image.addEventListener("load", () => {
-    if (!isCurrentRender()) return;
-    fallback.remove();
-    image.hidden = false;
-  });
-  image.addEventListener("error", showFallback);
-  // The card is still detached here; connectivity guards are only for async cache updates.
-  container.append(fallback, image);
-  image.src = site.icon;
-
-  siteIconCacheStorage
-    .load(site.icon)
-    .then((entry) => {
-      if (!isCurrentRender()) {
-        return null;
-      }
-
-      if (entry?.dataUrl) {
-        setImageSource(entry.dataUrl);
-      }
-
-      if (siteIconCacheStorage.isFresh(entry)) {
-        return null;
-      }
-
-      return siteIconCacheStorage.refresh(site.icon);
-    })
-    .then((entry) => {
-      if (entry?.dataUrl) {
-        setImageSource(entry.dataUrl);
-      }
-    })
-    .catch(() => {
-      if (image.src !== site.icon && !container.contains(image)) {
-        setImageSource(site.icon);
-      }
-    });
+    image.addEventListener("load", () => {
+      if (!container.isConnected || container.dataset.iconRenderToken !== token) return;
+      fallback.remove();
+      image.hidden = false;
+    }, { once: true });
+    image.addEventListener("error", () => image.remove(), { once: true });
+    container.append(image);
+    image.src = result.url;
+  }).catch(() => { /* The initial stays visible when every source fails. */ });
 }
 
 function handleSearchSubmit(event) {
@@ -2071,6 +1953,7 @@ function openModal() {
 }
 
 function closeModal() {
+  resetIconPreview();
   elements.modalBackdrop.hidden = true;
   elements.editModal.hidden = true;
   elements.editModal.setAttribute("aria-hidden", "true");
@@ -2090,6 +1973,7 @@ function openGroupModal(group) {
 }
 
 function openSiteModal(site, groupId) {
+  resetIconPreview();
   elements.modalTitle.textContent = site ? "编辑网页" : "新增网页";
   elements.groupForm.hidden = true;
   elements.siteForm.hidden = false;
@@ -2098,8 +1982,9 @@ function openSiteModal(site, groupId) {
   elements.siteIdInput.value = site?.id || "";
   elements.siteNameInput.value = site?.name || "";
   elements.siteUrlInput.value = site?.url || "";
-  elements.siteIconInput.value = site?.icon || "";
+  elements.siteIconInput.value = site && getIconMode(site) === "custom" ? site.icon : "";
   openModal();
+  updateIconPreview();
   elements.siteNameInput.focus();
 }
 
@@ -2262,6 +2147,7 @@ async function handleSiteSubmit(event) {
       site.name = name;
       site.url = url;
       site.icon = icon;
+      site.iconMode = icon ? "custom" : "auto";
     }
   } else {
     nextData.sites.push({
@@ -2270,6 +2156,7 @@ async function handleSiteSubmit(event) {
       name,
       url,
       icon,
+      iconMode: icon ? "custom" : "auto",
     });
     state.activeGroupId = groupId;
   }
@@ -2279,19 +2166,53 @@ async function handleSiteSubmit(event) {
   showToast("网页已保存。");
 }
 
-function handleFetchSiteIcon() {
-  const url = normalizeUrl(elements.siteUrlInput.value);
-  const icon = getFaviconUrl(url);
+function resetIconPreview() {
+  iconPreviewRevision++;
+  clearTimeout(iconPreviewTimer);
+  elements.fetchSiteIconButton.disabled = false;
+  elements.fetchSiteIconButton.textContent = "重新获取";
+  elements.siteIconPreview.replaceChildren();
+  elements.siteIconStatus.textContent = "留空自动获取；自定义链接优先使用。";
+}
 
-  if (!icon) {
-    showToast("请先填写有效的网页链接。");
-    elements.siteUrlInput.focus();
+function scheduleIconPreview() {
+  resetIconPreview();
+  iconPreviewTimer = setTimeout(() => updateIconPreview(), 400);
+}
+
+async function updateIconPreview(force = false) {
+  const revision = ++iconPreviewRevision;
+  const url = normalizeUrl(elements.siteUrlInput.value);
+  const icon = elements.siteIconInput.value.trim();
+  if (!SiteIcons.safeUrl(url)) {
+    elements.siteIconStatus.textContent = "填写网页链接后可预览图标。";
     return;
   }
+  elements.fetchSiteIconButton.disabled = true;
+  elements.fetchSiteIconButton.textContent = "获取中…";
+  elements.siteIconStatus.textContent = "正在验证图标…";
+  const result = await getSiteIconResolver().resolve({ url, icon, iconMode: icon ? "custom" : "auto" }, { force }).catch(() => null);
+  if (revision !== iconPreviewRevision || elements.editModal.hidden || elements.siteForm.hidden) return;
+  elements.fetchSiteIconButton.disabled = false;
+  elements.fetchSiteIconButton.textContent = "重新获取";
+  if (result) {
+    const image = document.createElement("img");
+    image.alt = "网站图标预览";
+    image.referrerPolicy = "no-referrer";
+    image.src = result.url;
+    elements.siteIconPreview.replaceChildren(image);
+    elements.siteIconStatus.textContent = result.fallback
+      ? "自定义图标不可用，已找到备用图标；原链接会保留。"
+      : icon ? "自定义图标已验证。" : "已获取图标，将自动记住可用来源。";
+  } else {
+    // Keep a displayed preview if an explicit refresh temporarily fails.
+    elements.siteIconStatus.textContent = "暂未找到可用图标，导航将使用首字母。可填写图片链接或重试。";
+  }
+}
 
-  elements.siteIconInput.value = icon;
-  showToast("已获取图标链接。");
-  elements.siteIconInput.focus();
+function handleFetchSiteIcon() {
+  clearTimeout(iconPreviewTimer);
+  updateIconPreview(true);
 }
 
 async function handleBackgroundSubmit(event) {
