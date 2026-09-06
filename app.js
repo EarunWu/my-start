@@ -195,7 +195,22 @@ function createDefaultData() {
     version: DATA_VERSION,
     groups,
     sites,
-    widgets: [],
+    widgets: [
+      {
+        id: "default-clock-los-angeles",
+        type: "clock",
+        size: "large",
+        position: { x: 0.1226851852, y: 142 },
+        config: { timezone: "America/Los_Angeles", style: "digital", hour12: false, seconds: true },
+      },
+      {
+        id: "default-twitter-tibo",
+        type: "twitter",
+        size: "large",
+        position: { x: 0.0480582524, y: 607 },
+        config: { username: "thsottiaux" },
+      },
+    ],
     settings: {
       searchEngineId: "google",
       searchEngineName: "Google",
@@ -1717,21 +1732,21 @@ function populateSiteIcon(container, site) {
   container.append(fallback);
   const token = createId("icon-render");
   container.dataset.iconRenderToken = token;
-  getSiteIconResolver().resolve({ ...site, iconMode: getIconMode(site) }).then(result => {
-    if (!result || !container.isConnected || container.dataset.iconRenderToken !== token) return;
+  let sequence = 0;
+  const onCandidate = result => {
+    if (!container.isConnected || container.dataset.iconRenderToken !== token) return;
+    const current = ++sequence;
     const image = document.createElement("img");
     image.alt = "";
     image.referrerPolicy = "no-referrer";
-    image.hidden = true;
     image.addEventListener("load", () => {
-      if (!container.isConnected || container.dataset.iconRenderToken !== token) return;
-      fallback.remove();
-      image.hidden = false;
+      if (!container.isConnected || container.dataset.iconRenderToken !== token || current !== sequence) return;
+      container.replaceChildren(image);
     }, { once: true });
-    image.addEventListener("error", () => image.remove(), { once: true });
-    container.append(image);
     image.src = result.url;
-  }).catch(() => { /* The initial stays visible when every source fails. */ });
+  };
+  getSiteIconResolver().resolve({ ...site, iconMode: getIconMode(site) }, { onCandidate })
+    .catch(() => { /* Keep the last successfully displayed image or initial. */ });
 }
 
 function handleSearchSubmit(event) {
@@ -2191,17 +2206,28 @@ async function updateIconPreview(force = false) {
   elements.fetchSiteIconButton.disabled = true;
   elements.fetchSiteIconButton.textContent = "获取中…";
   elements.siteIconStatus.textContent = "正在验证图标…";
-  const result = await getSiteIconResolver().resolve({ url, icon, iconMode: icon ? "custom" : "auto" }, { force }).catch(() => null);
+  let previewSequence = 0;
+  const onCandidate = candidate => {
+    if (revision !== iconPreviewRevision || elements.editModal.hidden || elements.siteForm.hidden) return;
+    const current = ++previewSequence;
+    const image = document.createElement("img");
+    image.alt = "网站图标预览";
+    image.referrerPolicy = "no-referrer";
+    image.onload = () => {
+      if (revision === iconPreviewRevision && current === previewSequence && !elements.editModal.hidden)
+        elements.siteIconPreview.replaceChildren(image);
+    };
+    image.src = candidate.url;
+  };
+  const result = await getSiteIconResolver().resolve({ url, icon, iconMode: icon ? "custom" : "auto" }, { force, onCandidate }).catch(() => null);
   if (revision !== iconPreviewRevision || elements.editModal.hidden || elements.siteForm.hidden) return;
   elements.fetchSiteIconButton.disabled = false;
   elements.fetchSiteIconButton.textContent = "重新获取";
   if (result) {
-    const image = document.createElement("img");
-    image.alt = "网站图标预览";
-    image.referrerPolicy = "no-referrer";
-    image.src = result.url;
-    elements.siteIconPreview.replaceChildren(image);
-    elements.siteIconStatus.textContent = result.fallback
+    elements.siteIconStatus.textContent = result.lowResolution
+      ? icon && !result.fallback ? "自定义图标可用，但分辨率较低。可换用高清图片或留空自动获取。" : "已显示可用图标，暂未找到更高清的来源。"
+      : result.upgraded ? "已换用更清晰的网站图标；原链接会保留。"
+      : result.fallback
       ? "自定义图标不可用，已找到备用图标；原链接会保留。"
       : icon ? "自定义图标已验证。" : "已获取图标，将自动记住可用来源。";
   } else {

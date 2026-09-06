@@ -8,7 +8,7 @@
 - 自定义分组和网页，每个分组最多 15 个网页。
 - 可视化编辑模式：网页卡片抖动、删除角标、点击卡片编辑。
 - 支持本地配置导入和导出。
-- 桌面组件系统：编辑模式底部点击“添加组件”，可重复添加时钟、天气和 X / 推特，分别配置、复制、删除并撤销。
+- 桌面组件系统：编辑模式底部点击“添加组件”，可重复添加时钟、天气、X / 推特和知乎热榜，分别配置、复制、删除并撤销。
 - 组件可自由拖动，自动避让搜索、导航和其他组件，支持小／中／大三档尺寸；空间不足时向页面下方扩展。
 - 时钟支持可搜索的 IANA 时区、数字／指针样式、12／24 小时制和秒显示；天气支持城市搜索及未来四天预报。
 - 支持白色、黑色、自定义图片背景。
@@ -38,7 +38,9 @@ python serve.py --open
 
 当前站点：[My Start](https://mystart.pununu.com/)。备用地址：[workers.dev](https://web-start.lite-drop.workers.dev/)。
 
-项目通过 Workers Static Assets 发布，不需要构建页面。Node.js 和 Wrangler 仅用于部署，本地使用仍可运行 `start.cmd`。
+项目通过 Workers Static Assets 发布，不需要构建页面。知乎热榜由同一 Worker 的 `/api/zhihu/hot` 接口读取，解决知乎接口未开放浏览器跨域访问的问题。静态资源仍优先由 Assets 提供，只有 `/api/*` 优先进入 Worker，参见 [Cloudflare 路由说明](https://developers.cloudflare.com/workers/static-assets/routing/worker-script/)。
+
+本地体验包括知乎热榜在内的完整功能，安装依赖后运行 `npm run dev`，访问 `http://127.0.0.1:4173/`；端口已占用时可使用 `npm run dev -- --port 4187`。开发启动脚本将允许发布的静态文件复制到 `.wrangler/local-assets` 并监听源文件变化，避免 Wrangler 监听自身生成文件而重复重载。`start.cmd` / `serve.py` 和直接打开 HTML 仍可使用原有静态功能，但不提供知乎热榜后端。
 
 首次部署安装工具并登录 Cloudflare：
 
@@ -55,7 +57,7 @@ npm run deploy:check
 npm run deploy
 ```
 
-`.assetsignore` 只允许上传首页、两个样式文件、三个脚本和 Logo；配置、测试、依赖以及本地启动程序不会发布。新增运行时文件时，需要将它加入允许列表。
+`.assetsignore` 只允许上传首页、两个样式文件、五个浏览器脚本和 Logo；配置、测试、依赖以及本地启动程序不会作为静态文件发布。新增运行时文件时，需要将它加入允许列表。`server/worker.mjs` 作为 Worker 服务端代码单独打包。
 
 部署后的 HTTPS 网址拥有独立的浏览器存储。先在原页面导出配置，再在新网址导入，即可迁移网站、组件和背景图片。HTTPS 可以避免 `file://` 的安全来源问题，但不能解除 X 服务端的限流。
 
@@ -66,13 +68,15 @@ npm run deploy
 - 分组、网站、搜索引擎等配置存放在 `localStorage`。
 - 自定义背景图片存放在 `IndexedDB`，避免大图片撑爆 `localStorage`。
 - 导出配置时会把背景图片重新打包进 JSON。
-- 网站图标依次尝试自定义链接、上次成功地址、网站 `/favicon.ico`、`/favicon.svg` 和 Google 图标服务，全部失败后显示首字母。图片通过 `<img>` 加载，不跨域 `fetch` 图片或网页。
+- 网站图标依次尝试自定义链接、上次成功地址、网站 `/favicon.svg`、`/favicon.ico` 和 Google 图标服务。自动模式会检查实际图片尺寸，优先 SVG 或至少 96px 的图片（更高像素密度按需提高），备用服务请求 128px／256px。低清图片先显示，找到更清晰的来源后替换；没有高清来源时保留最清晰的可用图片，全部失败后才显示首字母。图片通过 `<img>` 加载，不跨域 `fetch` 图片或网页；SVG 类型根据地址后缀判断。
 - 成功图标地址在本地记忆 30 天（最多 200 个站点），图片内容由浏览器缓存；失败地址在当前页面冷却 5 分钟。同站点并发获取合并，每个候选地址最多等待 2.5 秒。“重新获取”可跳过失败冷却。
-- 编辑网页时，图标链接留空表示自动获取，填写链接表示自定义。窗口会验证图片并显示预览；自动回退不覆盖自定义链接。旧 Google 服务地址默认迁移为自动模式，其他旧图标保留为自定义；图标来源缓存不随配置导出。
+- 编辑网页时，图标链接留空表示自动获取，填写链接表示自定义。窗口会验证图片并显示预览；自定义图案即使分辨率较低也会保留并提示，指向该网站根目录 favicon 的链接允许寻找更高清的网站图标，但不改写原链接。旧 Google 服务地址默认迁移为自动模式，其他旧图标保留为自定义；旧缓存也会重新检查清晰度，图标来源缓存不随配置导出。
 
 当前版本没有账号、登录和云同步。
 
 ## 桌面组件
+
+没有本地配置时，默认放置 Tibo（`@thsottiaux`）动态和洛杉矶时钟，均为大尺寸。时钟使用 `America/Los_Angeles`、数字式、24 小时制并显示秒；布局沿用默认桌面位置，窄屏自动避让中心内容。已有配置、导入的旧配置以及主动清空的组件列表不会补入默认组件；手机仍隐藏组件。
 
 进入编辑模式，在底部选择“添加组件”。无论是否处于编辑模式，都可以按住组件顶部或空白区域直接拖动并自动保存，不显示拖动柄；键盘聚焦组件后，方向键微调，Shift + 方向键每次移动 10px，Enter 或移开焦点保存，Esc 取消本次移动。配置、复制和删除按钮只在编辑模式显示，删除后的提示提供撤销。动态正文、链接和视频区域保留正常的选择、滚动与点击操作。
 
@@ -92,6 +96,19 @@ X / 推特组件通过 [FxTwitter API](https://docs.fxembed.com/api/introduction
 
 FxTwitter 为第三方服务，当前公共接口无需 API Key，支持浏览器跨域访问，无需为此新增 Cloudflare 后端。可用性和数据更新速度取决于该服务及 X 上游。配置只保存公开用户名，不保存凭据或动态内容。
 
+知乎热榜展示创作者中心“知乎热题”的小时榜前 10 条，保留接口排名，包含标题、浏览量和回答数，点击在新标签页打开原问题。三档尺寸都支持列表内部滚动，顶部可直接拖动；支持重复添加、复制、删除撤销以及配置导入导出，不自动加入默认组件。
+
+每次打开页面及手动刷新时重新获取，不写入持久缓存；同一页面的多个热榜组件共享进行中的请求和当前显示的数据，点击任一刷新按钮会同步刷新。失败、空榜和超时有独立提示及重试入口，不回退模拟数据。
+
+线上请求链路为：浏览器 → My Start Worker `/api/zhihu/hot` → `https://mystart-api.pununu.com/api/zhihu/hot` → 知乎。反代部署在 `198.44.84.197`，使用现有 `danmu-caddy` 容器提供 HTTPS；子域名为 DNS only，Caddy 自动管理证书。反代只接受固定路径的 GET 请求，校验 Worker 的 Bearer 密钥后重写到 `https://www.zhihu.com/api/v4/creators/rank/hot?domain=0&period=hour`，移除密钥、Cookie 和转发来源头，不提供任意 URL 代理。全链路不缓存热榜响应。2026-09-06 上线后连续三次请求均返回 HTTP 200；知乎内部接口后续仍可能受上游风控影响，组件保留失败提示、重试和来源链接。
+
+### 知乎反代运维
+
+- Worker 变量 `ZHIHU_PROXY_URL` 指向固定的 HTTPS 反代地址，`ZHIHU_PROXY_KEY` 存放在 Worker Secret 中，不写入前端、配置导出或仓库。配置反代但缺少密钥时返回 503，不退回直连。`npm run dev` 会清空反代地址，使用本机直连知乎，无需生产密钥。
+- VPS 生效配置为 `/opt/danmu-api/Caddyfile`（仅 root 可读写），仓库保留无密钥模板 `server/zhihu-proxy.Caddyfile.template`。原有站点配置保持不变；添加前的备份为 `/opt/danmu-api/Caddyfile.before-mystart-20260906144144`。
+- 修改后先执行 `docker exec danmu-caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile`，验证通过后用 `caddy reload` 平滑加载同一文件。不要将带密钥的配置或 Caddy JSON 输出到公开日志。
+- 迁移或轮换时使用至少 32 字节随机密钥，同时更新 Caddy 匹配值和 Worker Secret（`wrangler secret put ZHIHU_PROXY_KEY`，通过标准输入传递）；更新 Secret 会发布 Worker。其他环境部署前需自行配置反代和密钥。
+
 ## 文件结构
 
 ```text
@@ -100,6 +117,10 @@ FxTwitter 为第三方服务，当前公共接口无需 API Key，支持浏览�
 ├── styles.css
 ├── app.js
 ├── twitter.js
+├── zhihu.js
+├── server/worker.mjs
+├── server/zhihu-proxy.Caddyfile.template
+├── scripts/dev.mjs
 ├── widgets.js
 ├── widgets.css
 ├── serve.py

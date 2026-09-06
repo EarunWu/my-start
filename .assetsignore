@@ -1,4 +1,7 @@
 # Publish only the files needed by the homepage.
+node_modules/
+.wrangler/
+.git/
 *
 !index.html
 !styles.css
@@ -7,6 +10,7 @@
 !icons.js
 !widgets.js
 !twitter.js
+!zhihu.js
 !assets/
 assets/*
 !assets/logo.svg

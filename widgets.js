@@ -3,7 +3,8 @@
   const SIZES = { small: [200, 160], medium: [260, 220], large: [360, 280] };
   const WEATHER_SIZES = { small: [260, 210], medium: [320, 280], large: [420, 360] };
   const TWITTER_SIZES = { small: [320, 360], medium: [380, 440], large: [460, 520] };
-  const widgetSize = widget => (widget.type === 'twitter' ? TWITTER_SIZES : widget.type === 'weather' ? WEATHER_SIZES : SIZES)[widget.size] || SIZES.medium;
+  const ZHIHU_SIZES = { small: [320, 350], medium: [390, 470], large: [460, 600] };
+  const widgetSize = widget => (widget.type === 'zhihu' ? ZHIHU_SIZES : widget.type === 'twitter' ? TWITTER_SIZES : widget.type === 'weather' ? WEATHER_SIZES : SIZES)[widget.size] || SIZES.medium;
   const GAP = 16;
   const WEATHER_TTL = 15 * 60 * 1000;
   const CACHE_KEY = 'my-start-weather-v1:';
@@ -200,6 +201,7 @@
   }
   const twitterIcon = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.9 2H22l-6.8 7.8L23.2 22h-6.3l-5-7.6L5.2 22H2l7.4-8.6L1.8 2h6.4l4.5 6.9L18.9 2Zm-1.1 18h1.8L7.2 3.9H5.3L17.8 20Z"/></svg>';
   const fxTwitter = root.FxTwitterKit || (typeof require === 'function' ? require('./twitter.js') : null);
+  const zhihu = root.ZhihuKit || (typeof require === 'function' ? require('./zhihu.js') : null);
   const renderTwitter = (widget, container) => fxTwitter.render(widget, container);
   const cleanupTwitter = card => fxTwitter.cleanup(card);
   const retryTwitter = widget => fxTwitter.retry(widget);
@@ -207,6 +209,12 @@
     return `<label>X 用户名或主页链接<input name="username" autocomplete="off" spellcheck="false" maxlength="200" placeholder="例如 @X 或 https://x.com/X" value="${escape(c.username)}" aria-describedby="twitterSettingsHint"></label><p id="twitterSettingsHint" class="twitter-settings-hint">显示返回列表中该账号最新发布的一条动态，不含转发和回复。默认显示中文译文，可切换原文。每次打开页面重新读取，可手动刷新。</p>`;
   }
   const registry = {
+    zhihu: {
+      name: '知乎热榜', description: '此刻热议的话题，一眼看到',
+      defaults: () => ({}), normalize: () => ({}),
+      render: (widget, container) => zhihu.render(widget, container), cleanup: card => zhihu.cleanup(card),
+      settings: () => '<p class="twitter-settings-hint">展示知乎小时热题前 10 条，点击标题打开原问题。每次打开页面重新获取，也可手动刷新；三个尺寸均可在卡片内滚动查看完整榜单。</p>',
+    },
     clock: {
       name: '时钟', description: '把世界各地的时间，放在手边',
       defaults: () => ({ timezone: localZone(), style: 'digital', hour12: false, seconds: true }),
@@ -338,10 +346,10 @@
       for (const w of widgets()) if (w.type === 'clock' && cards.has(w.id)) registry.clock.render(w, cards.get(w.id).querySelector('.widget-content'), now);
     }
     function refreshTwitter() {
-      for (const w of widgets()) if (w.type === 'twitter' && cards.has(w.id)) {
+      for (const w of widgets()) if (['twitter', 'zhihu'].includes(w.type) && cards.has(w.id)) {
         const card = cards.get(w.id);
-        if (!isDesktop()) registry.twitter.cleanup(card);
-        else if (!doc.hidden) registry.twitter.render(w, card.querySelector('.widget-content'));
+        if (!isDesktop()) registry[w.type].cleanup(card);
+        else if (!doc.hidden) registry[w.type].render(w, card.querySelector('.widget-content'));
       }
     }
     function render(nextEditing) {
@@ -403,6 +411,8 @@
       if (!drag) return;
       const card = cards.get(drag.id);
       if (card) { card.classList.remove('is-dragging'); applyRect(card, drag.original); }
+      // Pointer focus can inherit :focus-visible from the initially focused search input.
+      if (!drag.keyboard && doc.activeElement === card) card.blur();
       drag = null; preview.hidden = true;
       root.cancelAnimationFrame(scrollFrame); scrollFrame = 0; schedule();
     }
@@ -410,16 +420,19 @@
       if (!drag) return;
       const { id, candidate } = drag; cancelDrag();
       await mutate(list => list.map(w => w.id === id ? { ...w, position: positionFromRect(candidate) } : w));
-      cards.get(id)?.focus({ preventScroll: true });
+      // Keyboard moves already retain focus; saving must not reclaim it after Tab or a click.
     }
     layer.addEventListener('pointerdown', event => {
-      if (event.button !== 0 || event.target.closest('a, button, input, select, textarea, video, audio, [contenteditable], .twitter-scroll')) return;
+      if (event.button !== 0 || event.target.closest('a, button, input, select, textarea, video, audio, [contenteditable], .twitter-scroll, .zhihu-scroll')) return;
       const card = event.target.closest('[data-widget-id]'); if (!card) return;
       const id = card.dataset.widgetId;
       startDrag(id, event.pageX, event.pageY); if (!drag) return;
       drag.clientX = event.clientX; drag.clientY = event.clientY;
       scrollFrame = root.requestAnimationFrame(autoScroll);
-      event.preventDefault(); card.focus({ preventScroll: true }); card.setPointerCapture(event.pointerId);
+      event.preventDefault();
+      // Pointer dragging does not require keyboard focus on the card.
+      doc.activeElement?.blur?.();
+      card.setPointerCapture(event.pointerId);
     }, { signal });
     layer.addEventListener('pointermove', event => { if (drag && !drag.keyboard) { drag.clientX = event.clientX; drag.clientY = event.clientY; updateDrag(event.pageX, event.pageY); } }, { signal });
     layer.addEventListener('pointerup', () => { if (drag && !drag.keyboard) finishDrag(); }, { signal });
@@ -444,6 +457,7 @@
     layer.addEventListener('click', async event => {
       const card = event.target.closest('[data-widget-id]'); if (!card) return;
       const w = current(card.dataset.widgetId); if (!w) return;
+      if (w.type === 'zhihu' && event.target.closest('button.zhihu-refresh')) { zhihu.retry(); return; }
       if (w.type === 'twitter' && event.target.closest('button.twitter-refresh')) {
         retryTwitter(w);
         return;
@@ -483,7 +497,7 @@
     }
     function openPicker() {
       if (!isDesktop() || !editing) return;
-      dialogFrame('添加组件', `<p class="widget-dialog-description">为你的空间，添一点实用与个性。</p><div class="widget-picker">${Object.entries(registry).map(([type, def]) => `<button type="button" data-widget-type="${type}"><span class="widget-picker-icon">${type === 'twitter' ? twitterIcon : type === 'clock' ? '<svg viewBox="0 0 42 42" fill="none" stroke="currentColor" stroke-width="2"><circle cx="21" cy="21" r="16"/><path d="M21 10v12l8 4"/></svg>' : weatherIcon(2)}</span><strong>${def.name}</strong><span>${def.description}</span><em>添加 +</em></button>`).join('')}</div>`);
+      dialogFrame('添加组件', `<p class="widget-dialog-description">为你的空间，添一点实用与个性。</p><div class="widget-picker">${Object.entries(registry).map(([type, def]) => `<button type="button" data-widget-type="${type}"><span class="widget-picker-icon">${type === 'zhihu' ? '<span class="zhihu-mark">知</span>' : type === 'twitter' ? twitterIcon : type === 'clock' ? '<svg viewBox="0 0 42 42" fill="none" stroke="currentColor" stroke-width="2"><circle cx="21" cy="21" r="16"/><path d="M21 10v12l8 4"/></svg>' : weatherIcon(2)}</span><strong>${def.name}</strong><span>${def.description}</span><em>添加 +</em></button>`).join('')}</div>`);
       dialog.querySelectorAll('[data-widget-type]').forEach(button => button.addEventListener('click', () => {
         const type = button.dataset.widgetType;
         openSettings({ id: uid(), type, size: 'medium', position: { x: 0, y: 104 }, config: registry[type].defaults() });

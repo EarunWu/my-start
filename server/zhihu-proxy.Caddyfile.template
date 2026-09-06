@@ -1,0 +1,35 @@
+# Append this site to the existing Caddyfile after replacing __PROXY_KEY__.
+# Keep the rendered configuration private; never publish it as a static asset.
+mystart-api.pununu.com {
+    header {
+        Cache-Control "no-store"
+        X-Robots-Tag "noindex, nofollow"
+    }
+    @hot {
+        method GET
+        path /api/zhihu/hot
+        header Authorization "Bearer __PROXY_KEY__"
+    }
+    handle @hot {
+        rewrite * /api/v4/creators/rank/hot?domain=0&period=hour
+        reverse_proxy https://www.zhihu.com {
+            header_up Host www.zhihu.com
+            header_up Accept application/json
+            header_up User-Agent "MyStart/1.0 (+https://mystart.pununu.com)"
+            header_up -Authorization
+            header_up -Cookie
+            header_up -X-Forwarded-For
+            header_up -X-Forwarded-Host
+            header_up -X-Forwarded-Proto
+            header_down -Set-Cookie
+            header_down Cache-Control no-store
+            transport http {
+                dial_timeout 5s
+                response_header_timeout 10s
+            }
+        }
+    }
+    handle {
+        respond "Not found" 404
+    }
+}

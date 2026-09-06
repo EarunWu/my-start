@@ -1,9 +1,13 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "web-start",
+  "main": "server/worker.mjs",
   "account_id": "4fe0640728dac2d811b796a24a009398",
   "compatibility_date": "2026-09-06",
   "workers_dev": true,
+  "vars": {
+    "ZHIHU_PROXY_URL": "https://mystart-api.pununu.com/api/zhihu/hot"
+  },
   "routes": [
     {
       "pattern": "mystart.pununu.com",
@@ -12,7 +16,9 @@
     }
   ],
   "assets": {
-    "directory": "."
+    "directory": ".",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
   },
   "observability": {
     "enabled": true,

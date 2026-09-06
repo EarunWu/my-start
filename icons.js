@@ -25,7 +25,12 @@
       };
       const timer = setTimeout(() => finish(false), timeout);
       image.referrerPolicy = 'no-referrer';
-      image.onload = () => finish(image.naturalWidth > 0 && image.naturalHeight > 0);
+      image.onload = () => finish(image.naturalWidth > 0 && image.naturalHeight > 0 ? {
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+        // Cross-origin image bytes are not readable; the URL is a format hint.
+        vector: /^data:image\/svg\+xml[;,]/i.test(url) || /\.svg$/i.test(new URL(url, 'https://local.invalid').pathname),
+      } : false);
       image.onerror = () => finish(false);
       image.src = url;
     });
@@ -37,10 +42,11 @@
   }
 
   class Resolver {
-    constructor({ storage, probe = probeImage, now = Date.now } = {}) {
+    constructor({ storage, probe = probeImage, now = Date.now, pixelRatio = root.devicePixelRatio || 1 } = {}) {
       this.storage = storage;
       this.probe = probe;
       this.now = now;
+      this.targetSize = Math.max(96, Math.ceil(36 * pixelRatio));
       this.entries = {};
       this.pending = new Map();
       this.failures = new Map();
@@ -68,40 +74,73 @@
       const custom = site.iconMode === 'custom' ? customUrl(site.icon) : '';
       const saved = this.entries[origin];
       const remembered = saved && this.now() - saved.at < SUCCESS_TTL ? saved.url : '';
-      return [...new Set([custom, remembered, `${origin}/favicon.ico`, `${origin}/favicon.svg`,
-        `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=64`].filter(Boolean))];
+      const conventional = custom === `${origin}/favicon.ico` || custom === `${origin}/favicon.svg`;
+      const preferred = conventional ? [remembered, custom] : [custom, remembered];
+      return [...new Set([...preferred, `${origin}/favicon.svg`, `${origin}/favicon.ico`,
+        `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=${this.targetSize > 128 ? 256 : 128}`].filter(Boolean))];
     }
 
-    resolve(site, { force = false } = {}) {
+    resolve(site, { force = false, onCandidate } = {}) {
       // Snapshot the inputs: editing a bookmark cannot change an in-flight lookup.
       site = { ...site };
       const page = safeUrl(site.url);
       if (!page) return Promise.resolve(null);
       const origin = new URL(page).origin;
       const key = JSON.stringify([origin, site.iconMode === 'custom' ? site.icon : '', force]);
-      if (this.pending.has(key)) return this.pending.get(key);
+      // Rendering may still be attaching a card when it subscribes to shared progress.
+      const notify = (listener, result) => { queueMicrotask(() => {
+        try { listener?.(result); } catch { /* A removed view must not stop other views. */ }
+      }); };
+      if (this.pending.has(key)) {
+        const shared = this.pending.get(key);
+        if (onCandidate) shared.listeners.add(onCandidate);
+        if (shared.best) notify(onCandidate, shared.best);
+        return shared.promise;
+      }
+      const request = { listeners: new Set(onCandidate ? [onCandidate] : []), best: null, promise: null };
       const revision = (this.revisions.get(origin) || 0) + 1;
       this.revisions.set(origin, revision);
+      const custom = site.iconMode === 'custom' ? customUrl(site.icon) : '';
+      const conventional = custom === `${origin}/favicon.ico` || custom === `${origin}/favicon.svg`;
+      const publish = result => {
+        request.best = result;
+        for (const listener of request.listeners) notify(listener, result);
+      };
+      const saveBest = () => {
+        const best = request.best;
+        if (best && this.revisions.get(origin) === revision && best.url !== custom) this.remember(origin, best.url);
+        return best;
+      };
       const work = (async () => {
         for (const url of this.candidates(site)) {
           const failedAt = this.failures.get(url);
           if (!force && failedAt !== undefined && this.now() - failedAt < FAILURE_TTL) continue;
-          let ok = false;
-          try { ok = await this.probe(url); } catch { /* Try the next source. */ }
-          if (ok) {
+          let info;
+          try { info = await this.probe(url); } catch { /* Try the next source. */ }
+          if (Number.isFinite(info?.width) && info.width > 0 && Number.isFinite(info?.height) && info.height > 0) {
             this.failures.delete(url);
-            // Custom choices belong to the bookmark, not every bookmark on this domain.
-            if (this.revisions.get(origin) === revision &&
-                !(site.iconMode === 'custom' && url === customUrl(site.icon))) this.remember(origin, url);
-            return { url, fallback: site.iconMode === 'custom' && url !== customUrl(site.icon) };
+            const size = Math.min(info.width, info.height);
+            const score = info.vector ? Infinity : size;
+            const result = { url, width: info.width, height: info.height, vector: !!info.vector,
+              lowResolution: !info.vector && size < this.targetSize,
+              fallback: !!custom && url !== custom, upgraded: !!custom && conventional && url !== custom };
+            if (!request.best || score > (request.best.vector ? Infinity : Math.min(request.best.width, request.best.height))) publish(result);
+            // Preserve intentionally chosen artwork. A conventional site favicon may be upgraded.
+            if (url === custom && !conventional) return result;
+            if (!result.lowResolution) return saveBest();
+            continue;
           }
           this.failures.set(url, this.now());
           if (this.failures.size > 500) this.failures.delete(this.failures.keys().next().value);
         }
-        return null;
+        return saveBest();
       })();
-      this.pending.set(key, work);
-      work.finally(() => { if (this.pending.get(key) === work) this.pending.delete(key); });
+      request.promise = work;
+      this.pending.set(key, request);
+      work.finally(() => {
+        request.listeners.clear();
+        if (this.pending.get(key) === request) this.pending.delete(key);
+      });
       return work;
     }
   }
