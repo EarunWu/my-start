@@ -289,6 +289,7 @@
     const dialog = doc.createElement('dialog'); dialog.className = 'widget-dialog'; dialog.setAttribute('aria-labelledby', 'widgetDialogTitle'); doc.body.append(dialog);
     const abort = new AbortController(), signal = abort.signal;
     const cards = new Map(), positions = new Map();
+    let pendingDrop = null;
     let editing = false, drag = null, modalDraft = null, citySearch = null, busy = false, scheduled = 0, scrollFrame = 0, signature = '', returnFocus = null;
     let queue = Promise.resolve();
     const client = new WeatherClient({ onChange: () => paintWeather() });
@@ -316,7 +317,8 @@
     }
     function desiredRect(w) {
       const [width, height] = widgetSize(w);
-      return { x: GAP + w.position.x * Math.max(0, doc.documentElement.clientWidth - width - GAP * 2), y: w.position.y, width, height };
+      const position = pendingDrop?.id === w.id ? pendingDrop.position : w.position;
+      return { x: GAP + position.x * Math.max(0, doc.documentElement.clientWidth - width - GAP * 2), y: position.y, width, height };
     }
     function applyRect(el, r) { Object.assign(el.style, { left: `${r.x}px`, top: `${r.y}px`, width: `${r.width}px`, height: `${r.height}px` }); }
     function layout() {
@@ -386,7 +388,7 @@
     }
     function positionFromRect(r) { return { x: clamp((r.x - GAP) / Math.max(1, doc.documentElement.clientWidth - r.width - GAP * 2), 0, 1), y: r.y }; }
     function startDrag(id, x, y, keyboard = false) {
-      if (busy || !isDesktop() || drag || !positions.has(id)) return;
+      if (busy || pendingDrop || !isDesktop() || drag || !positions.has(id)) return;
       const r = positions.get(id);
       drag = { id, original: { ...r }, candidate: { ...r }, x, y, keyboard };
       cards.get(id).classList.add('is-dragging'); preview.hidden = false; applyRect(preview, r);
@@ -407,19 +409,26 @@
       if (speed) { root.scrollBy(0, speed); updateDrag(drag.clientX + root.scrollX, drag.clientY + root.scrollY); }
       scrollFrame = root.requestAnimationFrame(autoScroll);
     }
-    function cancelDrag() {
+    function endDrag(rect) {
       if (!drag) return;
       const card = cards.get(drag.id);
-      if (card) { card.classList.remove('is-dragging'); applyRect(card, drag.original); }
+      if (card) { card.classList.remove('is-dragging'); applyRect(card, rect); }
       // Pointer focus can inherit :focus-visible from the initially focused search input.
       if (!drag.keyboard && doc.activeElement === card) card.blur();
       drag = null; preview.hidden = true;
       root.cancelAnimationFrame(scrollFrame); scrollFrame = 0; schedule();
     }
+    function cancelDrag() { if (drag) endDrag(drag.original); }
     async function finishDrag() {
       if (!drag) return;
-      const { id, candidate } = drag; cancelDrag();
-      await mutate(list => list.map(w => w.id === id ? { ...w, position: positionFromRect(candidate) } : w));
+      const { id, candidate } = drag;
+      const position = positionFromRect(candidate);
+      // Keep both the immediate paint and subsequent layouts at the drop position
+      // until storage has committed. Cancellation still restores the original rect.
+      pendingDrop = { id, position };
+      endDrag(candidate);
+      try { await mutate(list => list.map(w => w.id === id ? { ...w, position } : w)); }
+      finally { pendingDrop = null; schedule(); }
       // Keyboard moves already retain focus; saving must not reclaim it after Tab or a click.
     }
     layer.addEventListener('pointerdown', event => {
