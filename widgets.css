@@ -1,0 +1,175 @@
+body { position: relative; }
+.widget-layer { position: absolute; inset: 0 0 auto; height: 0; pointer-events: none; z-index: 10; }
+.desktop-widget { position: absolute; pointer-events: auto; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); box-shadow: var(--shadow-soft); color: var(--text); }
+.widget-content { width: 100%; height: 100%; padding: 22px; overflow: hidden; border-radius: inherit; }
+.widget-controls { position: absolute; z-index: 2; top: -13px; left: 10px; right: 10px; display: none; align-items: center; justify-content: space-between; pointer-events: none; }
+.widget-controls > div { display: flex; gap: 3px; }
+.widget-controls button { pointer-events: auto; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid var(--line-strong); border-radius: 9px; color: var(--muted-strong); background: var(--surface); box-shadow: 0 2px 6px #3020400a; font-size: 18px; }
+.widget-controls button:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.widget-controls [data-action="delete"]:hover { color: var(--danger); background: var(--danger-soft); }
+.widget-controls .widget-drag { cursor: grab; touch-action: none; font-size: 22px; }
+.widget-layer.is-editing .widget-controls { display: flex; }
+.widget-layer.is-editing .desktop-widget { border: 1px dashed var(--line-strong); }
+.widget-layer.is-saving .widget-controls { pointer-events: none; opacity: .5; }
+.widget-layer.is-saving .widget-controls button { pointer-events: none; }
+.desktop-widget.is-dragging { opacity: .72; z-index: 3; box-shadow: 0 14px 36px #44306e24; }
+.desktop-widget.is-dragging .widget-drag { cursor: grabbing; }
+.widget-placement-preview { position: absolute; border: 2px dashed var(--accent); border-radius: 22px; background: color-mix(in srgb, var(--accent-soft) 65%, transparent); pointer-events: none; }
+.widget-eyebrow { color: var(--muted); font-size: 10px; font-weight: 600; line-height: 1.4; letter-spacing: .06em; }
+.clock-content { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+.clock-zone { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); font-size: 14px; font-weight: 650; line-height: 1.35; letter-spacing: .02em; }
+.clock-date { color: var(--muted-strong); font-size: 14px; font-weight: 500; line-height: 1.35; white-space: nowrap; }
+.clock-face { display: block; width: 120px; height: 120px; flex-shrink: 0; }
+.clock-content.analog { gap: 7px; }
+.clock-dial { fill: var(--surface-soft); stroke: var(--line); }
+.clock-ticks { stroke: var(--muted); stroke-width: 1.8; stroke-linecap: round; }
+.clock-hands { fill: none; stroke: var(--text); stroke-width: 4; stroke-linecap: round; }
+.clock-hands .minute-hand { stroke-width: 2.5; }
+.clock-hands .second-hand { stroke: var(--accent); stroke-width: 1.4; }
+.clock-pin { fill: var(--accent); }
+.widget-size-small .widget-content { padding: 16px; }
+.widget-size-small .clock-face { width: 74px; height: 74px; }
+.widget-size-small .clock-content { gap: 10px; }
+.widget-size-small .clock-content.analog { gap: 4px; }
+.widget-size-small .clock-zone { font-size: 13px; }
+.widget-size-small .clock-date { font-size: 12px; }
+.widget-size-large .clock-face { width: 174px; height: 174px; }
+.widget-size-large .clock-content.analog { gap: 8px; }
+.widget-size-large .clock-zone { font-size: 16px; }
+.widget-size-large .clock-date { font-size: 15px; }
+.widget-clock:has(.digital) { border-radius: 24px; }
+.widget-clock .clock-content.digital { align-items: stretch; justify-content: space-between; gap: 0; }
+.clock-digital-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.clock-city { display: flex; align-items: center; gap: 7px; min-width: 0; color: var(--text); font-size: 15px; font-weight: 550; line-height: 1.4; }
+.clock-city > i { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--accent); }
+.clock-city > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clock-offset { color: var(--muted-strong); font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.clock-digital { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; color: var(--text); font-size: 52px; font-weight: 550; font-variant-numeric: tabular-nums; letter-spacing: -2.5px; line-height: 1.1; }
+.clock-colon { color: var(--accent); }
+.clock-seconds { font-size: 20px; color: var(--muted-strong); letter-spacing: -.6px; font-weight: 450; }
+.clock-digital-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.clock-period { padding: 6px 9px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); font-size: 12px; white-space: nowrap; line-height: 1.4; }
+.widget-size-small .clock-digital-header { gap: 7px; padding-bottom: 10px; }
+.widget-size-small .clock-city { font-size: 12px; gap: 5px; }
+.widget-size-small .clock-offset { font-size: 10px; }
+.widget-size-small .clock-digital { font-size: 39px; letter-spacing: -1.8px; gap: 6px; }
+.widget-size-small .clock-seconds { font-size: 16px; }
+.widget-size-small .clock-period { padding: 4px 6px; font-size: 11px; border-radius: 6px; }
+.widget-size-large .clock-digital-header { padding-bottom: 20px; }
+.widget-size-large .clock-city { font-size: 16px; }
+.widget-size-large .clock-offset { font-size: 12px; }
+.widget-size-large .clock-digital { font-size: 68px; gap: 10px; letter-spacing: -3px; }
+.widget-size-large .clock-seconds { font-size: 25px; }
+.widget-size-large .clock-period { padding: 7px 11px; font-size: 13px; }
+.widget-weather .widget-content { display: flex; flex-direction: column; padding: 24px; }
+.weather-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 18px; font-weight: 650; line-height: 1.4; }
+.weather-heading > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.weather-heading > .widget-eyebrow { flex-shrink: 0; font-size: 12px; color: var(--muted-strong); }
+.weather-current { display: flex; align-items: center; gap: 12px; margin: 16px 0; }
+.weather-symbol { width: 42px; height: 42px; flex-shrink: 0; color: var(--accent); }
+.weather-current > .weather-symbol { width: 54px; height: 54px; }
+.weather-current strong { font-size: 52px; font-weight: 550; letter-spacing: -2px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.weather-current small { font-size: 34px; font-weight: 450; }
+.weather-current > span { margin-left: auto; color: var(--muted-strong); font-size: 14px; }
+.weather-details { display: flex; flex-direction: column; gap: 7px; color: var(--muted-strong); font-size: 13px; line-height: 1.5; }
+.weather-forecast { display: none; }
+.weather-source { display: flex; flex-wrap: wrap; gap: 5px 8px; align-items: center; margin-top: auto; padding-top: 14px; color: var(--muted-strong); font-size: 12px; line-height: 1.4; }
+.weather-source a { color: inherit; text-decoration: none; }
+.weather-source a:hover { color: var(--accent); text-decoration: underline; }
+.weather-source > span { margin-left: auto; }
+.weather-source.is-stale { color: var(--muted-strong); }
+.widget-retry { padding: 0; border: 0; background: none; color: var(--accent); font-size: inherit; }
+.widget-retry:hover { text-decoration: underline; }
+.widget-empty { height: calc(100% - 20px); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.widget-size-small .weather-details, .widget-size-small .weather-forecast { display: none; }
+.widget-weather.widget-size-small .widget-content { padding: 20px; }
+.widget-size-small .weather-heading { font-size: 16px; }
+.widget-size-small .weather-current { gap: 8px; margin: 16px 0 10px; }
+.widget-size-small .weather-current > span { font-size: 13px; }
+.widget-size-small .weather-current strong { font-size: 42px; }
+.widget-size-small .weather-current > .weather-symbol { width: 42px; height: 42px; }
+.widget-size-small .weather-source { font-size: 11px; }
+.widget-size-large .weather-current { margin: 10px 0; }
+.widget-size-large .weather-details { flex-direction: row; flex-wrap: wrap; justify-content: space-between; gap: 6px; }
+.widget-size-large .weather-forecast { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
+.weather-forecast > div { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 4px; border-radius: 12px; background: var(--surface-soft); font-size: 14px; line-height: 1.3; }
+.weather-forecast > div > span:first-child { color: var(--muted-strong); }
+.weather-forecast .weather-symbol { width: 32px; height: 32px; }
+.weather-forecast em { color: var(--muted); font-style: normal; }
+.widget-dialog { width: min(480px, calc(100vw - 40px)); max-height: calc(100dvh - 64px); padding: 28px; border: 1px solid var(--line); border-radius: 24px; color: var(--text); background: var(--surface); box-shadow: 0 24px 100px #20173426; overflow-y: auto; }
+.widget-twitter .widget-content { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
+.twitter-heading, .twitter-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-shrink: 0; }
+.twitter-brand { display: flex; align-items: center; gap: 10px; }
+.twitter-brand svg { width: 20px; height: 20px; }
+.twitter-brand strong { font-size: 14px; font-weight: 550; }
+.twitter-refresh { border: 1px solid var(--line); background: var(--surface-soft); color: var(--accent); border-radius: 10px; padding: 8px 14px; font-size: 13px; }
+.twitter-heading .twitter-refresh { width: 30px; height: 30px; padding: 0; font-size: 23px; line-height: 1; }
+.twitter-refresh:hover { background: var(--accent-soft); border-color: var(--accent); }
+.twitter-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; border-radius: 14px; }
+.twitter-scroll iframe { max-width: 100% !important; }
+.twitter-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.twitter-status { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 18px; gap: 14px; text-align: center; background: var(--surface-soft); border-radius: 14px; }
+.twitter-status[hidden] { display: none; }
+.twitter-status:not([hidden]) + .twitter-scroll { flex: 0; height: 0; overflow: hidden; }
+.twitter-status strong { font-size: 16px; font-weight: 550; }
+.twitter-status p { margin: 0; color: var(--muted-strong); font-size: 13px; line-height: 1.7; }
+.twitter-status-icon { font-size: 28px; color: var(--accent); }
+.twitter-loading { width: 26px; height: 26px; border: 2px solid var(--line-strong); border-top-color: var(--accent); border-radius: 50%; animation: twitter-loading 1s linear infinite; }
+.twitter-footer { border-top: 1px solid var(--line); padding-top: 12px; font-size: 12px; }
+.twitter-footer > span { color: var(--muted-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.twitter-footer a { color: var(--accent); white-space: nowrap; text-decoration: none; }
+.twitter-footer a:hover { text-decoration: underline; }
+.twitter-settings-hint { margin: 0; color: var(--muted-strong); font-size: 12px; line-height: 1.8; }
+@keyframes twitter-loading { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .twitter-loading { animation: none; } }
+.widget-dialog::backdrop { background: #2017344d; backdrop-filter: blur(6px); }
+.widget-dialog-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; }
+.widget-dialog-heading .widget-eyebrow { font-size: 9px; letter-spacing: .16em; color: var(--accent); }
+.widget-dialog h2 { font-size: 23px; margin: 8px 0 0; font-weight: 650; }
+.widget-dialog-close { width: 32px; height: 32px; padding: 0; border: 0; background: var(--surface-soft); border-radius: 10px; color: var(--muted-strong); font-size: 24px; }
+.widget-dialog-description { color: var(--muted-strong); font-size: 12px; margin-bottom: 24px; }
+.widget-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.widget-picker > button { min-width: 0; padding: 24px 16px 18px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; text-align: left; border: 1px solid var(--line); border-radius: 18px; background: var(--surface-soft); color: var(--text); }
+.widget-picker > button:hover { border-color: var(--accent); background: var(--accent-soft); }
+.widget-picker-icon { width: 48px; height: 48px; display: grid; place-items: center; color: var(--accent); margin-bottom: 6px; }
+.widget-picker-icon svg { width: 42px; height: 42px; }
+.widget-picker strong { font-size: 16px; }
+.widget-picker button > span:not(.widget-picker-icon) { font-size: 11px; color: var(--muted-strong); line-height: 1.7; }
+.widget-picker em { font-size: 11px; font-style: normal; color: var(--accent); margin-top: 8px; }
+.widget-settings-fields { display: flex; flex-direction: column; gap: 17px; margin-top: 24px; }
+.widget-settings label { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--muted-strong); }
+.widget-settings input:not([type="checkbox"]), .widget-settings select { width: 100%; min-width: 0; height: 42px; padding: 0 12px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); border-radius: 10px; font-size: 13px; }
+.widget-settings .widget-check { flex-direction: row; align-items: center; }
+.timezone-field { position: relative; display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--muted-strong); }
+.timezone-trigger { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; padding: 11px 12px; border: 1px solid var(--line-strong); border-radius: 10px; text-align: left; background: var(--surface); color: var(--text); font-size: 14px; }
+.timezone-trigger:hover, .timezone-trigger[aria-expanded="true"] { border-color: var(--accent); }
+.timezone-trigger span { display: flex; flex-direction: column; gap: 4px; }
+.timezone-trigger small { color: var(--muted); font-size: 11px; }
+.timezone-trigger svg { width: 18px; height: 18px; flex-shrink: 0; fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.timezone-trigger[aria-expanded="true"] svg { transform: rotate(180deg); }
+.timezone-panel { position: fixed; z-index: 5; display: flex; flex-direction: column; padding: 10px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 36px #24194226; }
+.widget-settings #widgetTimezoneSearch { height: 38px; flex-shrink: 0; background: var(--surface-soft); font-size: 12px; }
+#widgetTimezoneList { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin-top: 8px; scrollbar-width: thin; }
+#widgetTimezoneList > button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 0; padding: 10px; border-radius: 8px; text-align: left; background: transparent; color: var(--text); }
+#widgetTimezoneList > button > span { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+#widgetTimezoneList strong { font-size: 13px; font-weight: 550; }
+#widgetTimezoneList small { font-size: 10px; color: var(--muted); overflow-wrap: anywhere; }
+#widgetTimezoneList em { font-size: 11px; font-style: normal; color: var(--muted-strong); white-space: nowrap; font-variant-numeric: tabular-nums; }
+#widgetTimezoneList > button:hover, #widgetTimezoneList > button.is-highlighted { background: var(--surface-soft); }
+#widgetTimezoneList > button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); }
+#widgetTimezoneCount { margin: 9px 2px 0; color: var(--muted); font-size: 10px; line-height: 1.6; }
+.widget-check input { accent-color: var(--accent); width: 16px; height: 16px; }
+.widget-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.widget-dialog-actions button, .city-search-row button { min-height: 40px; border-radius: 10px; font-size: 12px; }
+.widget-form-error { min-height: 16px; margin: 16px 0 0; font-size: 12px; color: var(--danger); }
+.city-search-row { display: flex; gap: 8px; }
+.city-search-row button { flex-shrink: 0; }
+.widget-city-selected { margin: -5px 0 0; font-size: 11px; color: var(--accent); line-height: 1.6; }
+.widget-city-results { display: grid; gap: 6px; max-height: 190px; overflow: auto; color: var(--muted-strong); font-size: 12px; }
+.widget-city-results:empty { display: none; }
+.widget-city-results button { text-align: left; padding: 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); color: var(--text); font-size: 12px; }
+.widget-city-results button:hover { border-color: var(--accent); background: var(--accent-soft); }
+body[data-background="black"] .desktop-widget, body[data-background="black"] .widget-dialog { --surface: #171b23; --surface-soft: #202531; --text: #edf0f7; --muted: #979cab; --muted-strong: #b4bac9; --line: #2b3140; --line-strong: #41465b; --accent: #b5a0ff; --accent-soft: #302b47; }
+body[data-background="image"] .desktop-widget { background: rgb(248 249 252 / 93%); backdrop-filter: blur(18px); }
+body.is-editing .toast { bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
+@media (max-width: 680px) { .widget-layer, #addWidgetButton { display: none !important; } }

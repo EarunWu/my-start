@@ -1,4 +1,4 @@
-const DATA_VERSION = 3;
+const DATA_VERSION = 4;
 const MAX_SITES_PER_GROUP = 15;
 const MAX_BACKGROUND_IMAGE_BYTES = 3 * 1024 * 1024;
 const STORAGE_KEY = "my-start-config-v1";
@@ -175,6 +175,7 @@ function createDefaultData() {
     version: DATA_VERSION,
     groups,
     sites,
+    widgets: [],
     settings: {
       searchEngineId: "google",
       searchEngineName: "Google",
@@ -249,6 +250,7 @@ function normalizeData(input) {
     version: DATA_VERSION,
     groups: normalizedGroups,
     sites: limitSitesPerGroup(normalizedSites),
+    widgets: globalThis.WidgetKit?.normalize(source.widgets) || [],
     settings: normalizeSettings(source.settings, fallback.settings),
     updatedAt: normalizeText(source.updatedAt) || nowIso(),
   };
@@ -395,6 +397,15 @@ async function fetchIconAsDataUrl(iconUrl) {
   return readBlobAsDataUrl(blob);
 }
 
+function canCacheIcon(iconUrl, pageUrl = globalThis.location?.href) {
+  try {
+    const page = new URL(pageUrl), icon = new URL(iconUrl, page);
+    return /^https?:$/.test(page.protocol) && icon.origin === page.origin;
+  } catch {
+    return false;
+  }
+}
+
 const siteIconCacheStorage = {
   async load(iconUrl) {
     if (!iconUrl) {
@@ -420,6 +431,9 @@ const siteIconCacheStorage = {
   },
 
   async refresh(iconUrl) {
+    // Cross-origin icons render in <img>; reading their bytes requires CORS permission.
+    // Let the browser HTTP cache handle those images and keep existing local entries usable.
+    if (!canCacheIcon(iconUrl)) return null;
     const dataUrl = await fetchIconAsDataUrl(iconUrl);
     return this.save(iconUrl, dataUrl);
   },
@@ -453,7 +467,7 @@ function shouldApplyNavigationPresetMigration(source) {
 
   const sourceVersion = Number(source.version || 0);
   const sourcePresetId = normalizeText(source.settings?.navigationPresetId);
-  return sourceVersion < DATA_VERSION && sourcePresetId !== NAVIGATION_PRESET_ID;
+  return sourceVersion < 3 && sourcePresetId !== NAVIGATION_PRESET_ID;
 }
 
 function applyNavigationPresetMigration(source) {
@@ -560,6 +574,7 @@ const state = {
 };
 
 const elements = {};
+let widgetController = null;
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -569,6 +584,15 @@ async function init() {
   updateHeaderDate();
   window.setInterval(updateHeaderDate, 60000);
   state.data = await storage.load();
+  widgetController = globalThis.WidgetKit?.create({
+    getData: () => state.data,
+    saveWidgets: async (widgets) => {
+      const next = cloneData(state.data);
+      next.widgets = widgets;
+      await saveData(next);
+    },
+    notify: showToast,
+  });
   state.activeGroupId = state.data.groups[0]?.id || "";
   render();
   focusSearchInput();
@@ -682,6 +706,7 @@ function bindEvents() {
   });
 
   document.addEventListener("keydown", (event) => {
+    if (event.defaultPrevented || widgetController?.isInteracting()) return;
     if (event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey && elements.editModal.hidden &&
         !event.target.closest("input, textarea, select, [contenteditable='true']")) {
       event.preventDefault();
@@ -723,6 +748,7 @@ function render() {
   renderJsonPanel();
   renderGroups();
   renderSites();
+  widgetController?.render(state.isEditing);
 }
 
 function ensureActiveGroup() {

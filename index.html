@@ -6,6 +6,7 @@
     <title>My Start</title>
     <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="widgets.css">
   </head>
   <body>
     <div class="page-shell">
@@ -31,6 +32,10 @@
       </div>
 
       <div class="edit-toolbar" id="editToolbar" hidden>
+        <button class="secondary-button toolbar-button" id="addWidgetButton" type="button">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"></rect><rect x="3" y="14" width="7" height="7" rx="2"></rect><rect x="14" y="3" width="7" height="7" rx="2"></rect><path d="M17.5 14v7m-3.5-3.5h7"></path></svg>
+          添加组件
+        </button>
         <button class="toolbar-button done-button" id="doneEditButton" type="button">
           <svg aria-hidden="true" viewBox="0 0 24 24">
             <path d="M20 6 9 17l-5-5"></path>
@@ -191,6 +196,7 @@
       <button id="toastAction" type="button" hidden></button>
     </div>
 
+    <script src="widgets.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
