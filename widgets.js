@@ -199,87 +199,12 @@
     return /^[a-z0-9_]{1,15}$/i.test(name) && !/^(home|explore|search|settings|messages|notifications|i|intent|share)$/i.test(name) ? name : '';
   }
   const twitterIcon = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.9 2H22l-6.8 7.8L23.2 22h-6.3l-5-7.6L5.2 22H2l7.4-8.6L1.8 2h6.4l4.5 6.9L18.9 2Zm-1.1 18h1.8L7.2 3.9H5.3L17.8 20Z"/></svg>';
-  let twitterScriptPromise;
-  function loadTwitterScript() {
-    if (root.twttr?.widgets?.createTimeline) return Promise.resolve(root.twttr);
-    if (twitterScriptPromise) return twitterScriptPromise;
-    twitterScriptPromise = new Promise((resolve, reject) => {
-      const script = root.document.createElement('script');
-      const finish = error => {
-        root.clearTimeout(timer); script.onload = script.onerror = null;
-        if (error) { script.remove(); reject(error); } else resolve(root.twttr);
-      };
-      const timer = root.setTimeout(() => finish(new Error('X script timed out')), 15000);
-      script.src = 'https://platform.twitter.com/widgets.js'; script.async = true;
-      script.dataset.widgetTwitterSdk = 'true';
-      script.onload = () => finish(root.twttr?.widgets?.createTimeline ? null : new Error('X unavailable'));
-      script.onerror = () => finish(new Error('X script failed'));
-      root.document.head.append(script);
-    }).catch(error => { twitterScriptPromise = null; throw error; });
-    return twitterScriptPromise;
-  }
-  const twitterMounts = new WeakMap();
-  const twitterAttempts = new Map();
-  const TWITTER_RETRY_INTERVAL = 60000;
-  function retryTwitter(widget, card, now = Date.now()) {
-    const account = twitterUsername(widget.config.username).toLowerCase();
-    const lastAttempt = twitterAttempts.get(account);
-    const remaining = lastAttempt === undefined ? 0 : Math.max(0, Math.ceil((lastAttempt + TWITTER_RETRY_INTERVAL - now) / 1000));
-    if (remaining) return remaining;
-    cleanupTwitter(card);
-    renderTwitter(widget, card.querySelector('.widget-content'));
-    return 0;
-  }
-  function cleanupTwitter(card) {
-    const container = card.querySelector('.widget-content');
-    const mount = twitterMounts.get(container);
-    if (mount) { mount.cancel(); twitterMounts.delete(container); container.replaceChildren(); }
-  }
-  function renderTwitter(widget, container) {
-    const username = twitterUsername(widget.config.username);
-    const theme = root.document.body.dataset.background === 'black' ? 'dark' : 'light';
-    const key = `${username}:${widget.size}:${theme}`;
-    if (twitterMounts.get(container)?.key === key) return;
-    twitterMounts.get(container)?.cancel();
-    const mount = { key, cancel: () => {} }; twitterMounts.set(container, mount);
-    container.innerHTML = `<div class="twitter-heading"><span class="twitter-brand">${twitterIcon}<strong>账号动态</strong></span><button class="twitter-refresh" type="button" aria-label="刷新 X 动态" title="刷新动态">↻</button></div><div class="twitter-status" role="status"></div><div class="twitter-scroll" tabindex="0" role="region" aria-label="X 动态内容"><div class="twitter-embed"></div></div><div class="twitter-footer"><span>@${escape(username || '未设置')}</span>${username ? `<a href="https://x.com/${username}" target="_blank" rel="noopener noreferrer">在 X 查看 ↗</a>` : ''}</div>`;
-    const status = container.querySelector('.twitter-status'), host = container.querySelector('.twitter-embed');
-    let disposed = false, timer;
-    mount.cancel = () => { disposed = true; root.clearTimeout(timer); };
-    const active = () => !disposed && container.isConnected && twitterMounts.get(container) === mount;
-    const fail = (stage = 'timeline') => {
-      if (!active()) return;
-      mount.cancel(); host.remove();
-      status.hidden = false;
-      const scriptFailed = stage === 'script';
-      status.innerHTML = `<span class="twitter-status-icon" aria-hidden="true">↗</span><strong>${scriptFailed ? '暂时无法连接 X' : '暂时无法显示动态'}</strong><p>${scriptFailed ? '官方嵌入脚本未能加载。你可以稍后重试，或在 X 查看。' : 'X 官方时间线未能完成加载。你可以稍后重试，或在 X 查看。'}</p><button class="twitter-refresh" type="button">重新加载</button>`;
-    };
-    if (!username) { status.textContent = '请在组件设置中填写 X 用户名'; return; }
-    if (root.location?.protocol === 'file:') {
-      status.innerHTML = '<span class="twitter-status-icon" aria-hidden="true">↗</span><strong>请通过本地网址打开</strong><p>直接打开 HTML 文件会受到嵌入来源限制。请先导出配置，再运行项目中的 start.cmd，在本地主页导入配置。</p><a class="twitter-refresh" href="http://127.0.0.1:4173/" target="_blank" rel="noopener noreferrer">打开本地主页 ↗</a>';
-      return;
-    }
-    for (const [account, time] of twitterAttempts) if (Date.now() - time >= TWITTER_RETRY_INTERVAL) twitterAttempts.delete(account);
-    twitterAttempts.set(username.toLowerCase(), Date.now());
-    status.innerHTML = '<span class="twitter-loading" aria-hidden="true"></span><strong>正在加载动态</strong><p>正在连接 X 官方脚本…</p>';
-    loadTwitterScript().then(sdk => {
-      if (!active()) return;
-      // Start the content timeout after the shared SDK is ready, not while it downloads.
-      timer = root.setTimeout(() => fail('timeline'), 25000);
-      status.innerHTML = '<span class="twitter-loading" aria-hidden="true"></span><strong>正在加载动态</strong><p>正在等待 X 返回动态…</p>';
-      return sdk.widgets.createTimeline({ sourceType: 'profile', screenName: username }, host, {
-        tweetLimit: 1, theme, chrome: 'noheader nofooter noborders transparent',
-        width: widgetSize(widget)[0] - 34, lang: 'zh-cn', dnt: true,
-      });
-    }, () => fail('script')).then(frame => {
-      if (!active()) return;
-      if (!frame) { fail(); return; }
-      root.clearTimeout(timer); status.hidden = true;
-      frame.title = `@${username} 的 X 动态`;
-    }).catch(() => fail('timeline'));
-  }
+  const fxTwitter = root.FxTwitterKit || (typeof require === 'function' ? require('./twitter.js') : null);
+  const renderTwitter = (widget, container) => fxTwitter.render(widget, container);
+  const cleanupTwitter = card => fxTwitter.cleanup(card);
+  const retryTwitter = widget => fxTwitter.retry(widget);
   function twitterSettings(c) {
-    return `<label>X 用户名或主页链接<input name="username" autocomplete="off" spellcheck="false" maxlength="200" placeholder="例如 @X 或 https://x.com/X" value="${escape(c.username)}" aria-describedby="twitterSettingsHint"></label><p id="twitterSettingsHint" class="twitter-settings-hint">显示该公开账号的一条动态，内容与排序由 X 提供。可随时刷新或打开原主页查看。</p>`;
+    return `<label>X 用户名或主页链接<input name="username" autocomplete="off" spellcheck="false" maxlength="200" placeholder="例如 @X 或 https://x.com/X" value="${escape(c.username)}" aria-describedby="twitterSettingsHint"></label><p id="twitterSettingsHint" class="twitter-settings-hint">显示返回列表中该账号最新发布的一条动态，不含转发和回复。默认显示中文译文，可切换原文。每次打开页面重新读取，可手动刷新。</p>`;
   }
   const registry = {
     clock: {
@@ -437,7 +362,9 @@
           card.dataset.widgetId = w.id; card.dataset.type = w.type;
           card.dataset.signature = JSON.stringify([w.type, w.size, w.config]);
           card.setAttribute('aria-label', `${registry[w.type].name}组件`);
-          card.innerHTML = `<div class="widget-controls"><button class="widget-drag" data-action="move" type="button" aria-label="移动${registry[w.type].name}组件" title="拖动或方向键移动，Shift 加速，Enter 保存，Esc 取消">⠿</button><div><button data-action="settings" type="button" aria-label="配置组件" title="配置">⚙</button><button data-action="copy" type="button" aria-label="复制组件" title="复制">⧉</button><button data-action="delete" type="button" aria-label="删除组件" title="删除">×</button></div></div><div class="widget-content"></div>`;
+          card.tabIndex = 0;
+          card.setAttribute('aria-description', '拖动顶部或空白区域移动；聚焦组件后可用方向键微调，Enter 保存，Esc 取消。');
+          card.innerHTML = `<div class="widget-controls"><div><button data-action="settings" type="button" aria-label="配置组件" title="配置">⚙</button><button data-action="copy" type="button" aria-label="复制组件" title="复制">⧉</button><button data-action="delete" type="button" aria-label="删除组件" title="删除">×</button></div></div><div class="widget-content"></div>`;
           layer.append(card); cards.set(w.id, card);
         }
         tick(); refreshWeather();
@@ -451,7 +378,7 @@
     }
     function positionFromRect(r) { return { x: clamp((r.x - GAP) / Math.max(1, doc.documentElement.clientWidth - r.width - GAP * 2), 0, 1), y: r.y }; }
     function startDrag(id, x, y, keyboard = false) {
-      if (busy || !editing || drag || !positions.has(id)) return;
+      if (busy || !isDesktop() || drag || !positions.has(id)) return;
       const r = positions.get(id);
       drag = { id, original: { ...r }, candidate: { ...r }, x, y, keyboard };
       cards.get(id).classList.add('is-dragging'); preview.hidden = false; applyRect(preview, r);
@@ -483,21 +410,23 @@
       if (!drag) return;
       const { id, candidate } = drag; cancelDrag();
       await mutate(list => list.map(w => w.id === id ? { ...w, position: positionFromRect(candidate) } : w));
-      cards.get(id)?.querySelector('.widget-drag').focus({ preventScroll: true });
+      cards.get(id)?.focus({ preventScroll: true });
     }
     layer.addEventListener('pointerdown', event => {
-      if (!event.target.closest('.widget-drag') || event.button !== 0) return;
-      const id = event.target.closest('[data-widget-id]').dataset.widgetId;
+      if (event.button !== 0 || event.target.closest('a, button, input, select, textarea, video, audio, [contenteditable], .twitter-scroll')) return;
+      const card = event.target.closest('[data-widget-id]'); if (!card) return;
+      const id = card.dataset.widgetId;
       startDrag(id, event.pageX, event.pageY); if (!drag) return;
       drag.clientX = event.clientX; drag.clientY = event.clientY;
       scrollFrame = root.requestAnimationFrame(autoScroll);
-      event.preventDefault(); event.target.focus({ preventScroll: true }); event.target.setPointerCapture(event.pointerId);
+      event.preventDefault(); card.focus({ preventScroll: true }); card.setPointerCapture(event.pointerId);
     }, { signal });
     layer.addEventListener('pointermove', event => { if (drag && !drag.keyboard) { drag.clientX = event.clientX; drag.clientY = event.clientY; updateDrag(event.pageX, event.pageY); } }, { signal });
     layer.addEventListener('pointerup', () => { if (drag && !drag.keyboard) finishDrag(); }, { signal });
     layer.addEventListener('pointercancel', cancelDrag, { signal });
+    layer.addEventListener('lostpointercapture', () => { if (drag && !drag.keyboard) cancelDrag(); }, { signal });
     layer.addEventListener('keydown', event => {
-      if (!event.target.closest('.widget-drag') || !editing) return;
+      if (!event.target.matches('[data-widget-id]')) return;
       const moves = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
       if (moves[event.key]) {
         event.preventDefault();
@@ -516,8 +445,11 @@
       const card = event.target.closest('[data-widget-id]'); if (!card) return;
       const w = current(card.dataset.widgetId); if (!w) return;
       if (w.type === 'twitter' && event.target.closest('button.twitter-refresh')) {
-        const remaining = retryTwitter(w, card);
-        if (remaining) notify(`请在 ${remaining} 秒后重试，避免频繁请求。此间隔不代表 X 的恢复时间。`);
+        retryTwitter(w);
+        return;
+      }
+      if (w.type === 'twitter' && event.target.closest('button.twitter-translation-toggle')) {
+        fxTwitter.toggleTranslation(card);
         return;
       }
       if (event.target.closest('.widget-retry')) { if (w.config.city) { client.load(w.config.city, true); paintWeather(); } return; }
@@ -679,14 +611,12 @@
     doc.querySelector('#addWidgetButton').addEventListener('click', openPicker, { signal });
     root.addEventListener('resize', () => { cancelDrag(); if (!isDesktop()) closeDialog(); schedule(); tick(); refreshWeather(); refreshTwitter(); }, { signal });
     doc.addEventListener('visibilitychange', () => { tick(); refreshWeather(); refreshTwitter(); }, { signal });
-    const themeObserver = new MutationObserver(refreshTwitter);
-    themeObserver.observe(doc.body, { attributes: true, attributeFilter: ['data-background'] });
     const observer = new ResizeObserver(schedule);
     ['.start-panel', '.page-shell', '.edit-toolbar'].forEach(s => { const el = doc.querySelector(s); if (el) observer.observe(el); });
     const clockTimer = root.setInterval(tick, 1000), weatherTimer = root.setInterval(refreshWeather, WEATHER_TTL);
     return {
       render, isInteracting: () => !!drag || dialog.open,
-      destroy() { cancelDrag(); abort.abort(); observer.disconnect(); themeObserver.disconnect(); for (const card of cards.values()) registry[card.dataset.type].cleanup(card); root.clearInterval(clockTimer); root.clearInterval(weatherTimer); root.cancelAnimationFrame(scheduled); client.destroy(); layer.remove(); dialog.remove(); doc.body.style.minHeight = ''; },
+      destroy() { cancelDrag(); abort.abort(); observer.disconnect(); for (const card of cards.values()) registry[card.dataset.type].cleanup(card); root.clearInterval(clockTimer); root.clearInterval(weatherTimer); root.cancelAnimationFrame(scheduled); client.destroy(); layer.remove(); dialog.remove(); doc.body.style.minHeight = ''; },
     };
   }
   const api = { create, normalize, placeRect, overlaps, clockParts, timezoneOptions, filterTimezones, weatherKind, validWeather, WeatherClient, twitterUsername, retryTwitter, registry, SIZES, widgetSize };

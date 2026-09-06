@@ -1,19 +1,22 @@
 body { position: relative; }
 .widget-layer { position: absolute; inset: 0 0 auto; height: 0; pointer-events: none; z-index: 10; }
-.desktop-widget { position: absolute; pointer-events: auto; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); box-shadow: var(--shadow-soft); color: var(--text); }
+.desktop-widget { position: absolute; pointer-events: auto; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); box-shadow: var(--shadow-soft); color: var(--text); cursor: grab; }
+.widget-clock .widget-content, .widget-weather .widget-content, .twitter-heading { touch-action: none; }
+.desktop-widget:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.desktop-widget :is(a, button, input, select, textarea, video, audio, [contenteditable], .twitter-scroll) { touch-action: auto; }
+.desktop-widget :is(video, audio, .twitter-scroll) { cursor: auto; }
 .widget-content { width: 100%; height: 100%; padding: 22px; overflow: hidden; border-radius: inherit; }
-.widget-controls { position: absolute; z-index: 2; top: -13px; left: 10px; right: 10px; display: none; align-items: center; justify-content: space-between; pointer-events: none; }
-.widget-controls > div { display: flex; gap: 3px; }
+.widget-controls { position: absolute; z-index: 2; top: -13px; left: 10px; right: 10px; display: flex; align-items: center; justify-content: flex-end; pointer-events: none; }
+.widget-controls > div { display: none; gap: 3px; }
 .widget-controls button { pointer-events: auto; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid var(--line-strong); border-radius: 9px; color: var(--muted-strong); background: var(--surface); box-shadow: 0 2px 6px #3020400a; font-size: 18px; }
 .widget-controls button:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
 .widget-controls [data-action="delete"]:hover { color: var(--danger); background: var(--danger-soft); }
-.widget-controls .widget-drag { cursor: grab; touch-action: none; font-size: 22px; }
-.widget-layer.is-editing .widget-controls { display: flex; }
+.widget-layer.is-editing .widget-controls > div { display: flex; }
 .widget-layer.is-editing .desktop-widget { border: 1px dashed var(--line-strong); }
 .widget-layer.is-saving .widget-controls { pointer-events: none; opacity: .5; }
 .widget-layer.is-saving .widget-controls button { pointer-events: none; }
 .desktop-widget.is-dragging { opacity: .72; z-index: 3; box-shadow: 0 14px 36px #44306e24; }
-.desktop-widget.is-dragging .widget-drag { cursor: grabbing; }
+.desktop-widget.is-dragging { cursor: grabbing; }
 .widget-placement-preview { position: absolute; border: 2px dashed var(--accent); border-radius: 22px; background: color-mix(in srgb, var(--accent-soft) 65%, transparent); pointer-events: none; }
 .widget-eyebrow { color: var(--muted); font-size: 10px; font-weight: 600; line-height: 1.4; letter-spacing: .06em; }
 .clock-content { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
@@ -106,7 +109,42 @@ body { position: relative; }
 .twitter-heading .twitter-refresh { width: 30px; height: 30px; padding: 0; font-size: 23px; line-height: 1; }
 .twitter-refresh:hover { background: var(--accent-soft); border-color: var(--accent); }
 .twitter-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; border-radius: 14px; }
-.twitter-scroll iframe { max-width: 100% !important; }
+.twitter-refresh:disabled { opacity: .4; cursor: wait; }
+.twitter-post { display: flex; flex-direction: column; gap: 16px; padding: 5px 3px 5px 0; min-width: 0; }
+.twitter-author { display: flex; align-items: center; gap: 11px; color: var(--text); text-decoration: none; min-width: 0; }
+.twitter-avatar { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 42px; overflow: hidden; border-radius: 14px; background: var(--accent-soft); color: var(--accent); }
+.twitter-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.twitter-author-names { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.twitter-author-names strong { font-size: 16px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.twitter-author-names > span { color: var(--muted-strong); font-size: 12px; }
+.twitter-post-text { margin: 0; font-size: 16px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.twitter-post-text a { color: var(--accent); text-decoration: none; }
+.twitter-post-text a:hover { text-decoration: underline; }
+.twitter-post [data-twitter-text][hidden] { display: none; }
+.twitter-translation-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; color: var(--muted-strong); font-size: 12px; }
+.twitter-translation-toggle { padding: 5px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--accent-soft); color: var(--accent); font-size: 12px; cursor: pointer; }
+.twitter-translation-toggle:hover { border-color: var(--accent); }
+.twitter-translation-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.twitter-photos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; border-radius: 15px; overflow: hidden; }
+.twitter-photos a { display: block; overflow: hidden; background: var(--surface-soft); }
+.twitter-photos img { display: block; width: 100%; height: 140px; object-fit: cover; }
+.twitter-photos-1 { grid-template-columns: 1fr; }
+.twitter-photos-1 img { height: auto; max-height: 280px; object-fit: contain; }
+.twitter-photos-3 a:first-child { grid-row: span 2; }
+.twitter-photos-3 a:first-child img { height: 285px; }
+.twitter-video { display: block; width: 100%; max-height: 280px; border-radius: 15px; background: #121218; }
+.twitter-quote { display: block; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-soft); padding: 13px; color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
+.twitter-quote strong { font-size: 13px; }
+.twitter-quote strong span { color: var(--muted-strong); font-weight: 400; }
+.twitter-quote p { font-size: 13px; line-height: 1.7; margin: 7px 0 0; white-space: pre-wrap; }
+.twitter-post-date { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; color: var(--muted-strong); font-size: 12px; text-decoration: none; }
+.twitter-post-date > span { color: var(--accent); }
+.twitter-stats { display: flex; gap: 24px; color: var(--muted-strong); font-size: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+.twitter-stats span { display: inline-flex; align-items: center; gap: 6px; }
+.twitter-stats svg { width: 15px; height: 15px; }
+.widget-size-small .twitter-post-text { font-size: 14px; }
+.widget-size-large .twitter-post-text { font-size: 17px; }
+.twitter-post a:focus-visible, .twitter-footer a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 .twitter-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .twitter-status { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 18px; gap: 14px; text-align: center; background: var(--surface-soft); border-radius: 14px; }
 .twitter-status[hidden] { display: none; }

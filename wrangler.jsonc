@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "web-start",
+  "account_id": "4fe0640728dac2d811b796a24a009398",
+  "compatibility_date": "2026-09-06",
+  "workers_dev": true,
+  "assets": {
+    "directory": "."
+  },
+  "observability": {
+    "enabled": true,
+    "traces": { "enabled": true }
+  }
+}

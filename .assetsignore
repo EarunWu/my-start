@@ -1,0 +1,11 @@
+# Publish only the files needed by the homepage.
+*
+!index.html
+!styles.css
+!widgets.css
+!app.js
+!widgets.js
+!twitter.js
+!assets/
+assets/*
+!assets/logo.svg
