@@ -8,6 +8,42 @@ const hd = { width: 128, height: 128, vector: false };
 const site = { url: 'https://litedrop.pununu.com/path', iconMode: 'auto' };
 const memory = () => { const values = new Map(); return { getItem: key => values.get(key), setItem: (key,value) => values.set(key,value) }; };
 
+test('restored sharp sources paint synchronously without probing; low-quality legacy sources still upgrade', async () => {
+  const storage = memory();
+  const first = new kit.Resolver({ storage, probe: async () => hd });
+  await first.resolve(site);
+  let calls = 0;
+  const restored = new kit.Resolver({ storage, probe: async () => { calls++; return hd; } });
+  assert.deepEqual(restored.peek(site), { url: 'https://litedrop.pununu.com/favicon.svg', needsProbe: false });
+  assert.equal(calls, 0);
+  restored.remember('https://litedrop.pununu.com', 'https://cdn.example.org/old.png');
+  assert.equal(restored.peek(site).needsProbe, true);
+  assert.equal(restored.peek({ ...site, iconMode: 'custom', icon: 'https://cdn.example.org/new.png' }).url, 'https://cdn.example.org/new.png');
+  assert.equal(restored.peek({ ...site, url: 'javascript:alert(1)' }), null);
+});
+
+test('broken cached images are evicted and a different source is discovered without retrying the broken URL', async () => {
+  const storage = memory(), calls = [];
+  const resolver = new kit.Resolver({ storage, probe: async url => { calls.push(url); return hd; } });
+  const initial = await resolver.resolve(site);
+  await resolver.forget(initial.url);
+  calls.length = 0;
+  assert.equal(resolver.peek(site), null);
+  assert.equal(new kit.Resolver({ storage }).peek(site), null);
+  assert.equal((await resolver.resolve(site)).url.endsWith('.ico'), true);
+  assert.equal(calls.includes(initial.url), false);
+});
+
+test('an expired source remains available for immediate paint while requesting an upgrade', async () => {
+  let now = 100;
+  const storage = memory();
+  const first = new kit.Resolver({ storage, now: () => now, probe: async () => hd });
+  await first.resolve(site);
+  now += 31 * 86400000;
+  const restored = new kit.Resolver({ storage, now: () => now });
+  assert.deepEqual(restored.peek(site), { url: 'https://litedrop.pununu.com/favicon.svg', needsProbe: true });
+});
+
 test('prefers SVG and remembers the successful URL across reloads', async () => {
   const storage = memory(), calls = [];
   const resolver = new kit.Resolver({ storage, probe: async url => { calls.push(url); return url.endsWith('.svg') ? hd : false; } });

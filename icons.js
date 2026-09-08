@@ -1,8 +1,23 @@
 (function (root) {
   'use strict';
   const SUCCESS_TTL = 30 * 86400000;
+  const STALE_TTL = 180 * 86400000;
   const FAILURE_TTL = 5 * 60000;
   const CACHE_KEY = 'my-start:icon-sources:v1';
+  let workerReady;
+
+  function imageCacheMessage(type, urls) {
+    if (!root.isSecureContext || !root.navigator?.serviceWorker) return Promise.resolve();
+    workerReady ||= root.navigator.serviceWorker.register('./icon-cache-sw.js')
+      .then(() => root.navigator.serviceWorker.ready).catch(() => null);
+    return Promise.race([workerReady.then(registration => new Promise(resolve => {
+      if (!registration?.active) return resolve();
+      const channel = new MessageChannel();
+      const timer = setTimeout(() => { channel.port1.close(); resolve(); }, 1500);
+      channel.port1.onmessage = () => { clearTimeout(timer); channel.port1.close(); resolve(); };
+      registration.active.postMessage({ type, urls }, [channel.port2]);
+    })), new Promise(resolve => setTimeout(resolve, 1800))]).catch(() => {});
+  }
 
   function safeUrl(value, base) {
     try {
@@ -55,16 +70,44 @@
         const saved = JSON.parse(storage?.getItem(CACHE_KEY) || '{}');
         for (const [origin, entry] of Object.entries(saved).slice(-200)) {
           if (safeUrl(origin) && safeUrl(entry?.url) && Number.isFinite(entry?.at) &&
-              entry.at <= now() && now() - entry.at < SUCCESS_TTL) this.entries[origin] = entry;
+              entry.at <= now() && now() - entry.at < STALE_TTL) this.entries[origin] = entry;
         }
       } catch { /* Storage is optional. */ }
     }
 
-    remember(origin, url) {
-      this.entries[origin] = { url, at: this.now() };
+    remember(origin, url, info = {}) {
+      this.entries[origin] = { url, at: this.now(), width: info.width, height: info.height, vector: !!info.vector };
       this.entries = Object.fromEntries(Object.entries(this.entries)
         .sort((a, b) => b[1].at - a[1].at).slice(0, 200));
       try { this.storage?.setItem(CACHE_KEY, JSON.stringify(this.entries)); } catch { /* Keep the in-memory result. */ }
+    }
+
+    // Paint the last successful source without waiting for another image probe.
+    peek(site) {
+      const page = safeUrl(site.url);
+      if (!page) return null;
+      const origin = new URL(page).origin;
+      const custom = site.iconMode === 'custom' ? customUrl(site.icon) : '';
+      const conventional = custom === `${origin}/favicon.ico` || custom === `${origin}/favicon.svg`;
+      const saved = this.entries[origin];
+      const remembered = saved && this.now() - saved.at < STALE_TTL ? saved.url : '';
+      const url = custom && !conventional ? custom : remembered || custom;
+      const intentional = custom && !conventional;
+      const sharp = saved?.vector || Math.min(saved?.width || 0, saved?.height || 0) >= this.targetSize;
+      return url ? { url, needsProbe: !intentional && (!remembered || !sharp || this.now() - saved.at >= SUCCESS_TTL) } : null;
+    }
+
+    cacheImage(url) {
+      if (safeUrl(url)) void imageCacheMessage('remember-icons', [url]);
+    }
+
+    async forget(url) {
+      this.failures.set(url, this.now());
+      for (const [origin, entry] of Object.entries(this.entries)) {
+        if (entry.url === url) delete this.entries[origin];
+      }
+      try { this.storage?.setItem(CACHE_KEY, JSON.stringify(this.entries)); } catch { /* Optional. */ }
+      await imageCacheMessage('forget-icons', [url]);
     }
 
     candidates(site) {
@@ -108,10 +151,11 @@
       };
       const saveBest = () => {
         const best = request.best;
-        if (best && this.revisions.get(origin) === revision && best.url !== custom) this.remember(origin, best.url);
+        if (best && this.revisions.get(origin) === revision && (best.url !== custom || conventional)) this.remember(origin, best.url, best);
         return best;
       };
       const work = (async () => {
+        if (force && root.navigator?.serviceWorker) await imageCacheMessage('forget-icons', this.candidates(site));
         for (const url of this.candidates(site)) {
           const failedAt = this.failures.get(url);
           if (!force && failedAt !== undefined && this.now() - failedAt < FAILURE_TTL) continue;

@@ -5,9 +5,9 @@ import { createContext, runInContext } from 'node:vm';
 
 const source = await readFile(new URL('../widgets.js', import.meta.url), 'utf8');
 const flush = () => new Promise(resolve => setImmediate(resolve));
-function harness() {
+function harness({ type = 'clock', navigation = null } = {}) {
   const frames = new Map(), nodes = [], saves = [], notices = [];
-  let frameId = 0;
+  let frameId = 0, timestamp = 0, onResize;
   class Element {
     constructor() {
       this.style = {}; this.dataset = {}; this.events = {}; this.children = []; this.hidden = false;
@@ -28,27 +28,32 @@ function harness() {
   }
   const shell = { offsetHeight: 800 }, addButton = new Element();
   const doc = new Element(); doc.body = new Element(); doc.documentElement = { clientWidth: 1280 }; doc.activeElement = doc.body;
+  Object.defineProperty(doc.documentElement, 'scrollHeight', { get: () => Math.max(900, parseFloat(doc.body.style.minHeight) || 0) });
   doc.createElement = () => { const e = new Element(); nodes.push(e); return e; };
-  doc.querySelector = selector => selector === '.page-shell' ? shell : selector === '#addWidgetButton' ? addButton : null;
+  doc.querySelector = selector => selector === '.page-shell' ? shell : selector === '#addWidgetButton' ? addButton : selector === '.start-panel' && navigation ? { getBoundingClientRect: () => ({ ...navigation, left: navigation.x, top: navigation.y - ctx.scrollY }) } : null;
   const ctx = createContext({ document: doc, console: { warn() {} }, Intl, URL, AbortController,
+    getComputedStyle: () => ({ visibility: 'visible' }),
     innerWidth: 1280, innerHeight: 900, scrollX: 0, scrollY: 0,
+    scrollBy(x, y) { ctx.scrollY = Math.max(0, Math.min(ctx.scrollY + y, doc.documentElement.scrollHeight - 900)); },
     requestAnimationFrame(fn) { frames.set(++frameId, fn); return frameId; }, cancelAnimationFrame(id) { frames.delete(id); },
-    setInterval() {}, clearInterval() {}, addEventListener() {}, ResizeObserver: class { observe() {} disconnect() {} },
+    setInterval() {}, clearInterval() {}, addEventListener() {}, ResizeObserver: class { constructor(fn) { onResize = fn; } observe() {} disconnect() {} },
   });
   runInContext(source, ctx);
   ctx.WidgetKit.registry.clock.render = () => {};
-  let data = { widgets: [{ id: 'clock', type: 'clock', size: 'small', position: { x: 0, y: 104 }, config: {} }] };
+  ctx.WidgetKit.registry.twitter.render = () => {};
+  ctx.WidgetKit.registry.twitter.cleanup = () => {};
+  let data = { widgets: [{ id: 'clock', type, size: type === 'twitter' ? 'large' : 'small', position: { x: 0, y: 104 }, config: {} }] };
   const controller = ctx.WidgetKit.create({ getData: () => data, notify: text => notices.push(text),
     saveWidgets: next => new Promise((resolve, reject) => saves.push({
       resolve: () => { data = { widgets: next }; controller.render(false); resolve(); }, reject,
     })),
   });
-  const frame = () => { for (const [id, fn] of [...frames]) { if (frames.delete(id)) fn(); } };
+  const frame = (elapsed = 1000 / 60) => { timestamp += elapsed; for (const [id, fn] of [...frames]) { if (frames.delete(id)) fn(timestamp); } };
   controller.render(false); frame();
   const [layer, preview, , card] = nodes;
-  const pointer = (name, x = 50, y = 200) => layer.emit(name, { target: card, button: 0, pointerId: 1, pageX: x, pageY: y, clientX: x, clientY: y });
+  const pointer = (name, x = 50, y = 200) => layer.emit(name, { target: card, button: 0, pointerId: 1, pageX: x, pageY: y + ctx.scrollY, clientX: x, clientY: y });
   const key = name => layer.emit('keydown', { target: card, key: name });
-  return { layer, card, preview, doc, controller, frame, pointer, key, saves, notices };
+  return { layer, card, preview, doc, controller, frame, pointer, key, saves, notices, ctx, resizeContent: () => onResize() };
 }
 
 test('pointer release keeps the drop position across delayed saving and re-layout without an original-position paint', async () => {
@@ -88,5 +93,34 @@ test('Esc cancels without saving, while keyboard confirmation keeps its new posi
   await flush(); h.frame(); assert.equal(h.card.style.left, '17px');
   h.saves[0].resolve(); await flush(); h.frame();
   assert.equal(h.card.style.left, '17px'); assert.equal(h.doc.activeElement, h.card);
+  h.controller.destroy();
+});
+
+test('large X card keeps canvas height stable when dragged back across content and during observer layouts', () => {
+  const h = harness({ type: 'twitter', navigation: { x: 300, y: 200, width: 680, height: 400 } });
+  h.pointer('pointerdown'); h.pointer('pointermove', 600, 870);
+  const expanded = parseFloat(h.doc.body.style.minHeight);
+  assert.ok(expanded > 1200);
+  h.pointer('pointermove', 500, 400);
+  assert.equal(parseFloat(h.doc.body.style.minHeight), expanded);
+  h.resizeContent(); h.frame();
+  assert.equal(parseFloat(h.doc.body.style.minHeight), expanded);
+  h.pointer('pointercancel'); h.controller.destroy();
+});
+
+test('edge scrolling is bounded, monotonic and stops away from the edge or after release', async () => {
+  const h = harness({ type: 'twitter' });
+  h.pointer('pointerdown'); h.pointer('pointermove', 500, 1200);
+  let last = 0;
+  for (let i = 0; i < 8; i++) {
+    h.resizeContent(); h.frame();
+    assert.ok(h.ctx.scrollY > last && h.ctx.scrollY - last <= 10.01);
+    last = h.ctx.scrollY;
+  }
+  h.pointer('pointermove', 500, 400); h.frame(); assert.equal(h.ctx.scrollY, last);
+  h.pointer('pointerup'); await flush(); h.saves[0].resolve(); await flush(); h.frame();
+  assert.equal(h.ctx.scrollY, last);
+  assert.ok(parseFloat(h.doc.body.style.minHeight) >= last + 900);
+  h.frame(); assert.equal(h.ctx.scrollY, last);
   h.controller.destroy();
 });

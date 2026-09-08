@@ -109,6 +109,14 @@ FxTwitter 为第三方服务，当前公共接口无需 API Key，支持浏览�
 - 修改后先执行 `docker exec danmu-caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile`，验证通过后用 `caddy reload` 平滑加载同一文件。不要将带密钥的配置或 Caddy JSON 输出到公开日志。
 - 迁移或轮换时使用至少 32 字节随机密钥，同时更新 Caddy 匹配值和 Worker Secret（`wrangler secret put ZHIHU_PROXY_KEY`，通过标准输入传递）；更新 Secret 会发布 Worker。其他环境部署前需自行配置反代和密钥。
 
+## 网站图标缓存
+
+导航优先显示上次成功的图标，已确认清晰度足够时不再重复探测；旧版仅保存网址的缓存会在后台补充清晰度信息。手动指定的图标仍优先保留。
+
+HTTPS 或 localhost 下，`icon-cache-sw.js` 将已成功显示的图标保存到浏览器 Cache Storage，最多保留 64 张图片。再次打开页面直接读取本地图片，满 30 天后在显示旧图标的同时尝试后台更新。更新失败保留已有图片；显示失败时清除对应缓存并尝试其他来源。编辑网站中的重新获取会清除候选图标缓存，重新探测。
+
+图片缓存独立于配置，不随配置导出。Service Worker 只读取已保存的图标图片，不缓存 HTML、脚本、天气、X 或知乎接口响应。浏览器不支持或禁止缓存、存储空间不足及通过 `file://` 打开时，自动回退到普通图片加载；新版本首次使用需先成功加载一次才能建立图片缓存。
+
 ## 文件结构
 
 ```text

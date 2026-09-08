@@ -1,4 +1,6 @@
+html { scrollbar-gutter: stable; }
 body { position: relative; }
+body.is-widget-dragging { overflow-anchor: none; }
 .widget-layer { position: absolute; inset: 0 0 auto; height: 0; pointer-events: none; z-index: 10; }
 .desktop-widget { position: absolute; pointer-events: auto; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); box-shadow: var(--shadow-soft); color: var(--text); cursor: grab; }
 .widget-clock .widget-content, .widget-weather .widget-content, .twitter-heading { touch-action: none; }

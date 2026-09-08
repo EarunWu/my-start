@@ -324,6 +324,9 @@
     function layout() {
       scheduled = 0;
       if (!isDesktop()) { doc.body.style.minHeight = ''; return; }
+      // The drag owns the canvas until release. ResizeObserver must not restore
+      // the saved layout/height while the pointer is extending the page.
+      if (drag) return;
       const blocked = obstacles(); positions.clear();
       let bottom = doc.querySelector('.page-shell').offsetHeight;
       for (const w of widgets()) {
@@ -331,7 +334,7 @@
         positions.set(w.id, r); blocked.push(r); bottom = Math.max(bottom, r.y + r.height + 112);
         if (cards.has(w.id) && drag?.id !== w.id) applyRect(cards.get(w.id), r);
       }
-      doc.body.style.minHeight = widgets().length ? `${bottom}px` : '';
+      doc.body.style.minHeight = widgets().length ? `${Math.max(bottom, root.scrollY + root.innerHeight)}px` : '';
     }
     function schedule() { if (!scheduled) scheduled = root.requestAnimationFrame(layout); }
     function paintWeather() {
@@ -390,7 +393,9 @@
     function startDrag(id, x, y, keyboard = false) {
       if (busy || pendingDrop || !isDesktop() || drag || !positions.has(id)) return;
       const r = positions.get(id);
-      drag = { id, original: { ...r }, candidate: { ...r }, x, y, keyboard };
+      drag = { id, original: { ...r }, candidate: { ...r }, x, y, keyboard,
+        canvasHeight: Math.max(doc.documentElement.scrollHeight || 0, root.scrollY + root.innerHeight), lastFrame: null };
+      doc.body.classList.add('is-widget-dragging');
       cards.get(id).classList.add('is-dragging'); preview.hidden = false; applyRect(preview, r);
     }
     function updateDrag(x, y) {
@@ -400,13 +405,20 @@
       drag.candidate = placeRect(raw, blocked, doc.documentElement.clientWidth);
       applyRect(cards.get(drag.id), { ...raw, x: clamp(raw.x, GAP, doc.documentElement.clientWidth - raw.width - GAP), y: Math.max(96, raw.y) });
       applyRect(preview, drag.candidate);
-      doc.body.style.minHeight = `${Math.max(doc.querySelector('.page-shell').offsetHeight, ...[...positions.values()].map(r => r.y + r.height + 112), raw.y + raw.height + 112, drag.candidate.y + raw.height + 112)}px`;
+      drag.canvasHeight = Math.max(drag.canvasHeight, doc.querySelector('.page-shell').offsetHeight, raw.y + raw.height + 112, drag.candidate.y + raw.height + 112);
+      doc.body.style.minHeight = `${drag.canvasHeight}px`;
     }
-    function autoScroll() {
+    function autoScroll(timestamp) {
       if (!drag || drag.keyboard) { scrollFrame = 0; return; }
       const y = drag.clientY;
-      const speed = y < 64 ? -Math.ceil((64 - y) / 4) : y > root.innerHeight - 64 ? Math.ceil((y - root.innerHeight + 64) / 4) : 0;
-      if (speed) { root.scrollBy(0, speed); updateDrag(drag.clientX + root.scrollX, drag.clientY + root.scrollY); }
+      const edge = y < 64 ? -clamp((64 - y) / 64, 0, 1) : y > root.innerHeight - 64 ? clamp((y - root.innerHeight + 64) / 64, 0, 1) : 0;
+      const elapsed = drag.lastFrame === null ? 1000 / 60 : clamp(timestamp - drag.lastFrame, 0, 32);
+      drag.lastFrame = timestamp;
+      if (edge) {
+        const before = root.scrollY;
+        root.scrollBy(0, edge * Math.abs(edge) * 600 * elapsed / 1000);
+        if (root.scrollY !== before) updateDrag(drag.clientX + root.scrollX, drag.clientY + root.scrollY);
+      }
       scrollFrame = root.requestAnimationFrame(autoScroll);
     }
     function endDrag(rect) {
@@ -416,6 +428,7 @@
       // Pointer focus can inherit :focus-visible from the initially focused search input.
       if (!drag.keyboard && doc.activeElement === card) card.blur();
       drag = null; preview.hidden = true;
+      doc.body.classList.remove('is-widget-dragging');
       root.cancelAnimationFrame(scrollFrame); scrollFrame = 0; schedule();
     }
     function cancelDrag() { if (drag) endDrag(drag.original); }

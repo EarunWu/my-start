@@ -1732,21 +1732,39 @@ function populateSiteIcon(container, site) {
   container.append(fallback);
   const token = createId("icon-render");
   container.dataset.iconRenderToken = token;
+  const resolver = getSiteIconResolver();
+  const input = { ...site, iconMode: getIconMode(site) };
   let sequence = 0;
+  let retrying = false;
+  let displayedUrl = "";
   const onCandidate = result => {
-    if (!container.isConnected || container.dataset.iconRenderToken !== token) return;
+    if (container.dataset.iconRenderToken !== token || displayedUrl === result.url) return;
     const current = ++sequence;
     const image = document.createElement("img");
     image.alt = "";
     image.referrerPolicy = "no-referrer";
     image.addEventListener("load", () => {
       if (!container.isConnected || container.dataset.iconRenderToken !== token || current !== sequence) return;
+      displayedUrl = result.url;
       container.replaceChildren(image);
+      resolver.cacheImage(result.url);
+    }, { once: true });
+    image.addEventListener("error", async () => {
+      if (!container.isConnected || container.dataset.iconRenderToken !== token || current !== sequence || retrying) return;
+      retrying = true;
+      await resolver.forget(result.url);
+      if (container.isConnected && container.dataset.iconRenderToken === token) {
+        resolver.resolve(input, { onCandidate }).catch(() => {});
+      }
     }, { once: true });
     image.src = result.url;
   };
-  getSiteIconResolver().resolve({ ...site, iconMode: getIconMode(site) }, { onCandidate })
-    .catch(() => { /* Keep the last successfully displayed image or initial. */ });
+  const cached = resolver.peek(input);
+  if (cached) onCandidate(cached);
+  if (!cached || cached.needsProbe) {
+    resolver.resolve(input, { onCandidate })
+      .catch(() => { /* Keep the last successfully displayed image or initial. */ });
+  }
 }
 
 function handleSearchSubmit(event) {

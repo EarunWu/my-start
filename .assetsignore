@@ -8,6 +8,7 @@ node_modules/
 !widgets.css
 !app.js
 !icons.js
+!icon-cache-sw.js
 !widgets.js
 !twitter.js
 !zhihu.js
